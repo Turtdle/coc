@@ -174,11 +174,11 @@ function overview() {
 
   const war3 = DATA.members.filter((m) => m.war.all.attacks >= 3)
     .sort((a, b) => b.war.all.triples / b.war.all.attacks - a.war.all.triples / a.war.all.attacks || b.war.all.attacks - a.war.all.attacks).slice(0, 5);
-  const donors = [...DATA.members].sort((a, b) => b.donations - a.donations).slice(0, 5);
+  const donors = DATA.members.filter((m) => m.donations_total).sort((a, b) => b.donations_total - a.donations_total).slice(0, 5);
   const perfect = (DATA.cwl_history?.perfect || []).slice(0, 5);
   html += `<div class="cols">
     <section><h2>Best 3-star rate</h2>${rankList(war3.map((m) => [m, pct(m.war.all.triples / m.war.all.attacks), `${m.war.all.attacks} attacks`]))}</section>
-    <section><h2>Top donors <small>this season</small></h2>${rankList(donors.map((m) => [m, num(m.donations), `got ${num(m.received)}`]))}</section>
+    <section><h2>Top donors</h2>${rankList(donors.map((m) => [m, num(m.donations_total), `got ${num(m.received_total)}`]))}</section>
     ${perfect.length ? `<section><h2>Perfect CWLs</h2>${rankList(perfect.map((p) => [p, num(p.perfect), p.streak > 1 ? `${p.streak} in a row` : `of ${p.shown} seasons`]))}
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
   </div>`;
@@ -384,13 +384,13 @@ function streaksPage(order) {
 
 function membersPage() {
   const rows = DATA.members.map((m) => ({ ...m, cwl: cwlRecord(m.tag) }));
-  return `<h2>${num(DATA.members.length)} members</h2>` + table(rows, [
+  return `<h2>${num(DATA.members.length)} members</h2>
+    <p class="note">Donations are everything given since the bot started counting, so they don't reset each season.</p>` + table(rows, [
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
     { label: "League", key: (m) => m.league || "", html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
-    { label: "Donated", key: (m) => m.donations, html: (m) => `<b>${num(m.donations)}</b>`, num: true },
-    { label: "Total tracked", key: (m) => m.donations_total ?? -1, html: (m) => `<span class="muted">${m.donations_total == null ? "–" : num(m.donations_total)}</span>`, num: true },
+    { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
     { label: "Defense held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
     { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>` : `<span class="muted">–</span>`), num: true },
@@ -404,16 +404,14 @@ const METRICS = {
   stars: ["Total stars", (s) => s.attacks && s.triples * 3 + s.by_stars[2] * 2 + s.by_stars[1], (v) => `${v} ${star}`, (s) => `${s.attacks} attacks`],
   missed: ["Missed attacks", (s) => s.missed || false, (v) => v, (s) => `${s.wars} wars`],
   hold_rate: ["Defense hold rate", (s, d) => d.attacked >= 3 && d.held / d.attacked, (v) => pct(v), (s, d) => `held ${d.held} of ${d.attacked}`],
-  donations: ["Donations this season", null, (v) => num(v), null],
-  donations_total: ["Donations (total tracked)", null, (v) => num(v), null],
+  donations_total: ["Donations", null, (v) => num(v), null],
 };
 
 function leaderboardsPage(metric = "triple_rate", scope = "all") {
   if (!METRICS[metric]) metric = "triple_rate";
   const [label, value, fmt, detail] = METRICS[metric];
   let rows;
-  if (metric === "donations") rows = DATA.members.map((m) => [m, m.donations, `got ${num(m.received)}`]);
-  else if (metric === "donations_total") rows = DATA.members.filter((m) => m.donations_total != null).map((m) => [m, m.donations_total, `got ${num(m.received_total)}`]);
+  if (metric === "donations_total") rows = DATA.members.filter((m) => m.donations_total != null).map((m) => [m, m.donations_total, `got ${num(m.received_total)}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
   const opts = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("");
@@ -432,9 +430,8 @@ function playerPage(tag) {
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
   let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}</p></div></div>`;
   html += ledger([
-    [num(m.donations), "donated this season", "gold"],
-    [num(m.received), "received this season"],
-    m.donations_total != null && [num(m.donations_total), `donated since ${when(m.tracked_since)}`],
+    m.donations_total != null && [num(m.donations_total), `donated since ${when(m.tracked_since)}`, "gold"],
+    m.donations_total != null && [num(m.received_total), "received"],
   ]);
   for (const [scope, name] of [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]]) {
     const s = m.war[scope], d = m.defense[scope];
