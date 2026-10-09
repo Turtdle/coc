@@ -122,7 +122,7 @@ p { max-width: 68ch; }
 /* A row of figures between rules, like the stats box in a newspaper sports page. */
 .ledger { margin: 26px 0 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); overflow: hidden; }
 .ledger .in { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 0 0 -1px -1px; }
-.ledger.four .in { grid-template-columns: repeat(4, 1fr); }
+.ledger.three .in { grid-template-columns: repeat(3, 1fr); }
 .ledger .in > div { padding: 14px 18px 12px; border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule); min-width: 0; }
 .ledger b {
   display: block; font: 500 27px/1.15 var(--display); font-variation-settings: "opsz" 72;
@@ -295,7 +295,7 @@ footer p { margin: 0 0 6px; max-width: 80ch; }
   main { padding: 8px 16px 16px; }
   h2 { font-size: 24px; margin-top: 36px; }
   .ledger b { font-size: 21px; white-space: normal; }
-  .ledger .in, .ledger.four .in { grid-template-columns: repeat(2, 1fr); }
+  .ledger .in, .ledger.three .in { grid-template-columns: repeat(2, 1fr); }
   .ledger .in > div { padding: 12px 14px 10px; }
   .side img.cb { display: none; }
   .side .clan { font-size: 17px; }

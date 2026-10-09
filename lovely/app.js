@@ -1,6 +1,6 @@
 // Lovely clan mini site. Reads data.json (rebuilt hourly by the clan bot) and renders
 // everything client-side with hash routes: #/overview, #/members, #/war, #/cwl, #/cwl/<round>,
-// #/cwl/history, #/cwl/history/<season>, #/streaks, #/streaks/top, #/leaderboards, #/raids, #/player/<tag>.
+// #/cwl/history, #/cwl/history/<season>, #/streaks, #/streaks/top, #/leaderboards, #/player/<tag>.
 //
 // data.json's "war" is whatever war is on right now, a regular war or a CWL round (the
 // turtdle.github.io homepage reads it too). The War tab only shows regular wars ("war" when
@@ -159,11 +159,10 @@ function overview() {
     [esc(c.war_league || "–"), "war league"],
     [num(c.win_streak), "war win streak", "gold"],
     [`${num(c.record[0])}–${num(c.record[1])}–${num(c.record[2])}`, "won · tied · lost"],
-    [esc(c.capital_league || "–"), "capital league"],
     [`${num(c.members)}<span class="muted">/50</span>`, "members"],
     DATA.streaks?.length && [`<a href="#/streaks">${num(DATA.streaks.length)}</a>`, "win streaks we ended"],
     [c.required_th > 1 ? `TH${num(c.required_th)}+` : "Any TH", { inviteOnly: "invite only", open: "open to join", closed: "closed" }[c.type] || "to join"],
-  ], "four");
+  ], "three");
   if (c.labels.length) html += `<p class="tags">${c.labels.map(esc).join(" · ")}</p>`;
 
   if (live?.kind === "cwl") {
@@ -385,22 +384,6 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
     <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.</p>`;
 }
 
-function raidsPage(index = 0) {
-  if (!DATA.raids.length) return `<p class="empty">No raid weekends yet.</p>`;
-  const r = DATA.raids[index] || DATA.raids[0], raided = new Set(r.members.map((m) => m.tag));
-  const missing = DATA.members.filter((m) => !raided.has(m.tag));
-  setTimeout(() => { document.getElementById("weekend").onchange = (e) => { location.hash = `#/raids/${e.target.value}`; }; });
-  return `<div class="controls"><select id="weekend" aria-label="Raid weekend">${DATA.raids.map((x, i) => `<option value="${i}" ${x === r ? "selected" : ""}>Weekend of ${when(x.start, { month: "long", day: "numeric" })}</option>`).join("")}</select>
-    <span class="muted">${r.state === "ongoing" ? `ends in ${until(r.end)}` : "ended"}</span></div>`
-    + ledger([[num(r.loot), "capital gold", "gold"], [num(r.raids), "raids completed"], [num(r.districts), "districts destroyed"], [num(r.attacks), "attacks"], [num(r.members.length), "raiders"], [num(r.medals), "medals"]])
-    + `<h2>Raiders</h2>` + (r.members.length ? table(r.members, [
-      { label: "Raider", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) },
-      { label: "Attacks", key: (m) => m.attacks, html: (m) => `${m.attacks}/${m.limit}`, num: true },
-      { label: "Capital gold", key: (m) => m.loot, html: (m) => `<b>${num(m.loot)}</b>`, num: true },
-    ], 2) : `<p class="empty">Nobody raided.</p>`)
-    + (missing.length ? `<h3>Didn't raid (${missing.length})</h3>${names(missing.map((m) => who(m.tag, m.name)))}` : "");
-}
-
 function playerPage(tag) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
@@ -501,7 +484,7 @@ try { savedTheme = localStorage.getItem("theme"); } catch (e) { /* storage block
 setTheme(savedTheme === "dark");
 document.getElementById("mode").addEventListener("click", () => setTheme(document.documentElement.dataset.theme !== "dark", true));
 
-const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], ["cwl", "CWL"], ["streaks", "Streaks"], ["leaderboards", "Leaderboards"], ["raids", "Raids"]];
+const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], ["cwl", "CWL"], ["streaks", "Streaks"], ["leaderboards", "Leaderboards"]];
 
 function route() {
   const [, page = "overview", a, b] = location.hash.split("/");
@@ -509,7 +492,7 @@ function route() {
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, members: membersPage, war: warPage, cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), raids: () => raidsPage(a), player: () => playerPage(decodeURIComponent(a || "")),
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")),
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);
