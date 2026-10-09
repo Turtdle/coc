@@ -6,15 +6,88 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://api-assets.clashofclans.com data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Lovely · Clash of Clans</title>
   <meta name="description" content="War, CWL, raid and donation stats for the Lovely clan.">
+  <meta name="theme-color" content="#fbf4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1b1418" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" href="fraunces.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header id="top"></header>
-  <nav id="tabs"></nav>
-  <main id="page"><p class="muted center">Loading…</p></main>
+  <header class="mast">
+    <svg class="branch" viewBox="0 -26 470 250" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="petal-fill" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="24">
+          <stop class="petal-core" offset="0"/>
+          <stop class="petal-mid" offset=".38"/>
+          <stop class="petal-edge" offset="1"/>
+        </radialGradient>
+        <path id="petal" fill="url(#petal-fill)" d="M0 0C-8-4-11-14-6.5-21Q-4-24-1.5-22.5L0-20L1.5-22.5Q4-24 6.5-21C11-14 8-4 0 0Z"/>
+        <g id="flower">
+          <use href="#petal"/>
+          <use href="#petal" transform="rotate(72)"/>
+          <use href="#petal" transform="rotate(144)"/>
+          <use href="#petal" transform="rotate(216)"/>
+          <use href="#petal" transform="rotate(288)"/>
+          <g class="stamens">
+            <path d="M0 0L0-8M0 0L7.6-2.5M0 0L4.7 6.5M0 0L-4.7 6.5M0 0L-7.6-2.5"/>
+            <circle cx="0" cy="-8" r="1.2"/><circle cx="7.6" cy="-2.5" r="1.2"/><circle cx="4.7" cy="6.5" r="1.2"/>
+            <circle cx="-4.7" cy="6.5" r="1.2"/><circle cx="-7.6" cy="-2.5" r="1.2"/>
+          </g>
+          <circle class="eye" r="2.6"/>
+        </g>
+        <g id="bud">
+          <path class="calyx" d="M0 0C-3-2-4-5-2.5-7L0-5L2.5-7C4-5 3-2 0 0Z"/>
+          <ellipse class="bud" cx="0" cy="-10" rx="3.6" ry="5.6"/>
+        </g>
+      </defs>
+      <g class="bark">
+        <path stroke-width="10" d="M490 14C440 20 400 34 360 50"/>
+        <path stroke-width="7.5" d="M360 50C325 64 290 66 255 72"/>
+        <path stroke-width="5.5" d="M255 72C215 79 185 96 150 104"/>
+        <path stroke-width="3.8" d="M150 104C120 111 92 106 62 94"/>
+        <path stroke-width="2.2" d="M62 94C50 89 40 84 28 82"/>
+        <path stroke-width="3.4" d="M376 44C370 30 362 20 346 12"/>
+        <path stroke-width="1.8" d="M346 12C340 8 334 6 326 6"/>
+        <path stroke-width="2.8" d="M302 63C298 80 292 96 280 112"/>
+        <path stroke-width="2.6" d="M232 76C226 60 214 50 200 44"/>
+        <path stroke-width="2" d="M118 108C116 124 112 136 100 146"/>
+      </g>
+      <use href="#bud" transform="translate(362 26) rotate(-28)"/>
+      <use href="#bud" transform="translate(214 58) rotate(-50) scale(.9)"/>
+      <use href="#bud" transform="translate(296 88) rotate(160) scale(.85)"/>
+      <use href="#bud" transform="translate(70 97) rotate(200) scale(.8)"/>
+      <use href="#bud" transform="translate(326 6) rotate(-80) scale(.8)"/>
+      <use href="#flower" transform="translate(346 12) rotate(10) scale(.95)"/>
+      <use href="#flower" transform="translate(408 31) rotate(-8) scale(.72)"/>
+      <use href="#flower" transform="translate(322 60) rotate(-15) scale(.8)"/>
+      <use href="#flower" transform="translate(280 114) rotate(25) scale(1.05)"/>
+      <use href="#flower" transform="translate(252 77) rotate(4) scale(.68)"/>
+      <use href="#flower" transform="translate(200 44) rotate(40) scale(.9)"/>
+      <use href="#flower" transform="translate(150 104) rotate(-30) scale(.85)"/>
+      <use href="#flower" transform="translate(100 148) rotate(15) scale(.9)"/>
+      <use href="#flower" transform="translate(30 82) rotate(50) scale(.72)"/>
+      <g class="loose">
+        <use href="#petal" transform="translate(58 176) rotate(140) scale(.55)"/>
+        <use href="#petal" transform="translate(162 200) rotate(-100) scale(.5)"/>
+        <use href="#petal" transform="translate(232 166) rotate(64) scale(.46)"/>
+        <use href="#petal" transform="translate(16 134) rotate(205) scale(.5)"/>
+        <use href="#petal" transform="translate(372 120) rotate(-30) scale(.42)"/>
+      </g>
+    </svg>
+    <div class="mast-in">
+      <img id="badge" class="badge" alt="" hidden>
+      <div>
+        <p class="kicker" id="kicker">Clash of Clans</p>
+        <h1 id="clan-name">Lovely</h1>
+        <p class="sub" id="clan-sub"></p>
+        <a class="join" href="https://discord.gg/8wmVTaMsVR" target="_blank" rel="noopener">Join us on Discord <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </header>
+  <nav id="tabs" aria-label="Sections"></nav>
+  <main id="page"><p class="empty">Loading…</p></main>
   <footer id="foot"></footer>
   <script src="app.js"></script>
 </body>
