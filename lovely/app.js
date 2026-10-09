@@ -337,7 +337,7 @@ function streaksPage(order) {
   html += `<div class="streaks">${list.map((s, i) => `<article>
       <div class="len">${top ? `<span class="rank ${i ? "" : "r1"}">${i + 1}</span>` : ""}<b>${num(s.streak)}</b><span>wins</span></div>
       <div class="what"><h3 dir="auto">${esc(s.clan)}</h3><p>Ended ${day(s.date)}${s.note ? ` · ${esc(s.note)}` : ""}</p></div>
-      <div class="proof">${s.shots.map((src, n) => `<a href="${esc(src)}" target="_blank" rel="noopener" title="Screenshot ${n + 1}"><img src="${esc(src.replace(/\.webp$/, "-t.webp"))}" alt="Proof screenshot ${n + 1}" loading="lazy"></a>`).join("")}</div>
+      <div class="proof">${s.shots.map((src, n) => `<a class="shot" href="${esc(src)}" data-id="${s.id}" data-i="${n}" title="Screenshot ${n + 1}"><img src="${esc(src.replace(/\.webp$/, "-t.webp"))}" alt="Proof screenshot ${n + 1}" loading="lazy"></a>`).join("")}</div>
     </article>`).join("")}</div>
     <p class="note">Logged in our Discord with <b>/streaks add</b>. Tap a screenshot for the full size.</p>`;
   return html;
@@ -445,7 +445,62 @@ function playerPage(tag) {
   return html;
 }
 
+// ---------------------------------------------------------------- screenshot viewer
+// Streak proof opens over the page (a <dialog>): × or Esc or a click outside the picture closes
+// it; arrows, arrow keys or a swipe go through that streak's screenshots.
+const viewer = { shots: [], i: 0 };
+
+function showShot(i) {
+  viewer.i = (i + viewer.shots.length) % viewer.shots.length;
+  document.getElementById("viewer-img").src = viewer.shots[viewer.i];
+  document.getElementById("viewer-count").textContent = viewer.shots.length > 1 ? `${viewer.i + 1} of ${viewer.shots.length}` : "";
+}
+
+function setupViewer() {
+  const d = document.getElementById("viewer");
+  document.getElementById("page").addEventListener("click", (e) => {
+    const a = e.target.closest("a.shot");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;  // ctrl-click still opens a tab
+    const s = (DATA.streaks || []).find((x) => x.id === +a.dataset.id);
+    if (!s) return;
+    e.preventDefault();
+    viewer.shots = s.shots;
+    document.getElementById("viewer-cap").textContent = `${s.streak}-war win streak of ${s.clan}`;
+    d.classList.toggle("single", s.shots.length < 2);
+    showShot(+a.dataset.i);
+    d.showModal();
+  });
+  document.getElementById("viewer-close").addEventListener("click", () => d.close());
+  document.getElementById("viewer-prev").addEventListener("click", () => showShot(viewer.i - 1));
+  document.getElementById("viewer-next").addEventListener("click", () => showShot(viewer.i + 1));
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+  d.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") showShot(viewer.i - 1);
+    if (e.key === "ArrowRight") showShot(viewer.i + 1);
+  });
+  let x0 = null;
+  d.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  d.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - (x0 ?? e.changedTouches[0].clientX);
+    if (Math.abs(dx) > 50 && viewer.shots.length > 1) showShot(viewer.i + (dx < 0 ? 1 : -1));
+    x0 = null;
+  });
+  d.addEventListener("close", () => { document.getElementById("viewer-img").removeAttribute("src"); });
+}
+
 // ---------------------------------------------------------------- shell
+// Light by default; the header switch picks night blossom, remembered in this browser only.
+function setTheme(dark, save = false) {
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  document.querySelector('meta[name="theme-color"]').content = dark ? "#1b1418" : "#fbf4ef";
+  document.getElementById("mode").textContent = dark ? "Light mode" : "Dark mode";
+  if (save) try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) { /* storage blocked */ }
+}
+let savedTheme = null;
+try { savedTheme = localStorage.getItem("theme"); } catch (e) { /* storage blocked */ }
+setTheme(savedTheme === "dark");
+document.getElementById("mode").addEventListener("click", () => setTheme(document.documentElement.dataset.theme !== "dark", true));
+
 const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], ["cwl", "CWL"], ["streaks", "Streaks"], ["leaderboards", "Leaderboards"], ["raids", "Raids"]];
 
 function route() {
@@ -479,7 +534,8 @@ async function main() {
   document.getElementById("tabs").innerHTML = `<div class="in">${TABS.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
   document.getElementById("foot").innerHTML = `<p>Updated ${ago(DATA.generated_at)}. Data from the Clash of Clans API, refreshed hourly by our clan bot.</p>
     <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>`;
-  window.addEventListener("hashchange", route);
+  setupViewer();
+  window.addEventListener("hashchange", () => { document.getElementById("viewer").close(); route(); });
   route();
 }
 

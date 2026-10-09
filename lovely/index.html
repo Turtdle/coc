@@ -6,8 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://api-assets.clashofclans.com data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Lovely · Clash of Clans</title>
   <meta name="description" content="War, CWL, raid and donation stats for the Lovely clan.">
-  <meta name="theme-color" content="#fbf4ef" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1b1418" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fbf4ef">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -83,12 +82,23 @@
         <h1 id="clan-name">Lovely</h1>
         <p class="sub" id="clan-sub"></p>
         <a class="join" href="https://discord.gg/8wmVTaMsVR" target="_blank" rel="noopener">Join us on Discord <span aria-hidden="true">→</span></a>
+        <button class="mode" id="mode" type="button">Dark mode</button>
       </div>
     </div>
   </header>
   <nav id="tabs" aria-label="Sections"></nav>
   <main id="page"><p class="empty">Loading…</p></main>
   <footer id="foot"></footer>
+  <dialog id="viewer" class="viewer" aria-label="Screenshot">
+    <button class="vx" id="viewer-close" type="button" aria-label="Close">&times;</button>
+    <p class="vcap" id="viewer-cap"></p>
+    <img id="viewer-img" alt="">
+    <div class="vbar">
+      <button id="viewer-prev" type="button" aria-label="Previous screenshot">&larr;</button>
+      <span id="viewer-count"></span>
+      <button id="viewer-next" type="button" aria-label="Next screenshot">&rarr;</button>
+    </div>
+  </dialog>
   <script src="app.js"></script>
 </body>
 </html>
