@@ -75,10 +75,11 @@ main a:not(.now):hover, .link { color: var(--accent); }
 .mast .sub { margin: 0 0 16px; color: var(--ink-2); }
 .mast .sub span { white-space: nowrap; }
 .join {
-  display: inline-block; padding: 8px 16px; border: 1.5px solid var(--ink); border-radius: 3px;
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1.5px solid var(--ink); border-radius: 3px;
   font-weight: 600; font-size: 14px; transition: background .15s, color .15s, border-color .15s;
 }
 .join:hover { background: var(--ink); color: var(--paper); }
+.join .discord { width: 20px; height: 20px; fill: #5865f2; flex: none; }
 .mode {
   margin-left: 14px; padding: 0; border: 0; background: none; color: var(--ink-2); cursor: pointer;
   font: 500 14px var(--text); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 4px;
