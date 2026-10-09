@@ -34,6 +34,8 @@ const ROLES = { leader: "Leader", coLeader: "Co-leader", admin: "Elder", member:
 const ROLE_ORDER = { leader: 0, coLeader: 1, admin: 2, member: 3 };
 const RESULT = { W: "Won", L: "Lost", T: "Tied", inWar: "Live", preparation: "Prep" };
 const res = (r) => `<span class="res ${r}">${RESULT[r] || ""}</span>`;
+// The Clash of Clans war icon: two crossed swords. Marks links that open a war.
+const SWORDS = `<svg class="swords" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g transform="rotate(45 32 32)"><path class="bl" d="M32 3L37.5 11V41h-11V11Z"/><path class="fu" d="M32 10V38"/><rect class="gd" x="19" y="40" width="26" height="6.5" rx="3.2"/><rect class="gr" x="28.8" y="46.5" width="6.4" height="10" rx="1.6"/><circle class="gd" cx="32" cy="59" r="3.8"/></g><g transform="rotate(-45 32 32)"><path class="bl" d="M32 3L37.5 11V41h-11V11Z"/><path class="fu" d="M32 10V38"/><rect class="gd" x="19" y="40" width="26" height="6.5" rx="3.2"/><rect class="gr" x="28.8" y="46.5" width="6.4" height="10" rx="1.6"/><circle class="gd" cx="32" cy="59" r="3.8"/></g></svg>`;
 // A player's name, linked to their page while they're in the clan.
 const who = (tag, name) => (tag && MEMBERS.has(tag) ? `<a href="#/player/${encodeURIComponent(tag)}">${esc(name)}</a>` : esc(name));
 const names = (items) => `<p class="names">${items.map((x) => `<span class="n">${x}</span>`).join("")}</p>`;
@@ -115,7 +117,8 @@ function scoreboard(w, href = null) {
   const pts = w.state === "preparation" ? `<span class="dash">vs</span>` : `${w.us.stars}${star}${w.them.stars}`;
   const inner = `<p class="status">${esc(what)} · ${status}</p>
     <div class="sb">${side(w.us, "us")}<div class="pts">${pts}</div>${side(w.them, "them")}</div>`;
-  return href ? `<a class="now scoreboard" href="${href}">${inner}</a>` : `<div class="scoreboard">${inner}</div>`;
+  return href ? `<a class="now scoreboard" href="${href}">${inner}<span class="sb-go">${SWORDS}Open the war <span aria-hidden="true">→</span></span></a>`
+    : `<div class="scoreboard">${inner}</div>`;
 }
 
 function lineupTable(lineup, pending) {
@@ -283,7 +286,7 @@ function warButton(w) {
     <span class="wb-vs">vs <span dir="auto">${esc(w.them.name)}</span></span>
     <span class="wb-score">${prep ? "" : `${w.us.stars}${star}${w.them.stars}`}</span>
     <span class="wb-note">${prep ? "Line-up is set" : left ? `${left} attack${left > 1 ? "s" : ""} left` : "Everyone has attacked"}</span>
-    <span class="wb-go">Open the war <span aria-hidden="true">→</span></span>
+    <span class="wb-go">${SWORDS}Open the war <span aria-hidden="true">→</span></span>
   </a>`;
 }
 

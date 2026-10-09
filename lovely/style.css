@@ -223,7 +223,26 @@ main a.war-button:hover { color: var(--paper); background: var(--accent); }
 .wb-score { grid-area: score; font: 500 54px/1 var(--display); font-variation-settings: "opsz" 144; white-space: nowrap; text-align: right; }
 .wb-score img.star { width: 26px; height: 26px; vertical-align: 6px; margin: 0 6px; }
 .wb-note { grid-area: note; font-size: 14px; opacity: .8; }
-.wb-go { grid-area: go; font-weight: 600; font-size: 15px; white-space: nowrap; text-align: right; }
+.wb-go {
+  grid-area: go; justify-self: end; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  padding: 8px 16px 8px 10px; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 600; font-size: 15px;
+  transition: background .15s, color .15s;
+}
+.war-button:hover .wb-go { background: var(--paper); color: var(--ink); }
+
+/* Crossed swords (the game's war icon) on anything that opens a war. */
+.swords { width: 30px; height: 30px; flex: none; overflow: visible; }
+.swords .bl { fill: #e3e9f0; stroke: #221a20; stroke-width: 2.6; stroke-linejoin: round; }
+.swords .fu { stroke: #a9b6c4; stroke-width: 2.2; stroke-linecap: round; }
+.swords .gd { fill: #f2b632; stroke: #221a20; stroke-width: 2.6; }
+.swords .gr { fill: #8a5a2b; stroke: #221a20; stroke-width: 2.6; }
+a.now { position: relative; }
+.sb-go {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 7px 14px 7px 9px; border-radius: 3px;
+  border: 1.5px solid var(--ink); font-weight: 600; font-size: 14px; transition: background .15s, color .15s;
+}
+.sb-go .swords { width: 26px; height: 26px; }
+a.now:hover .sb-go { background: var(--ink); color: var(--paper); }
 
 .group tr.us td { background: var(--paper-2); font-weight: 600; }
 .group td:nth-child(2) { white-space: normal; }
