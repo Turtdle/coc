@@ -392,7 +392,7 @@ function membersPage() {
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
-    { label: "League", key: (m) => m.league || "", html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
+    { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
     { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
     { label: "Defense held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
