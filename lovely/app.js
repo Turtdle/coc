@@ -53,7 +53,7 @@ function seasonName(s) {
 }
 
 // A sortable table: columns = [{label, key(row) -> sort value, html(row), num}]
-function table(rows, columns, sortKey = null, sortDir = -1, rowClass = () => "") {
+function table(rows, columns, sortKey = null, sortDir = -1, rowClass = () => "", cls = "") {
   const id = `t${Math.random().toString(36).slice(2)}`;
   setTimeout(() => {
     const el = document.getElementById(id);
@@ -70,7 +70,7 @@ function table(rows, columns, sortKey = null, sortDir = -1, rowClass = () => "")
         });
       }
       el.querySelector("tbody").innerHTML = sorted
-        .map((r) => `<tr class="${rowClass(r)}">${columns.map((c) => `<td class="${c.num ? "num" : ""} ${c.wrap ? "wrap" : ""}">${c.html(r)}</td>`).join("")}</tr>`)
+        .map((r) => `<tr class="${rowClass(r)}">${columns.map((c) => `<td class="${c.num ? "num" : ""} ${c.center ? "mid" : ""} ${c.wrap ? "wrap" : ""}">${c.html(r)}</td>`).join("")}</tr>`)
         .join("");
       heads.forEach((h, i) => (i === state.col ? (h.dataset.dir = state.dir) : delete h.dataset.dir));
     };
@@ -83,8 +83,8 @@ function table(rows, columns, sortKey = null, sortDir = -1, rowClass = () => "")
     );
     draw();
   });
-  return `<div class="sheet"><table id="${id}"><thead><tr>${columns
-    .map((c) => `<th class="${c.num ? "num" : ""} ${c.key ? "sort" : ""}">${esc(c.label)}</th>`)
+  return `<div class="sheet"><table id="${id}" class="${cls}"><thead><tr>${columns
+    .map((c) => `<th class="${c.num ? "num" : ""} ${c.center ? "mid" : ""} ${c.key ? "sort" : ""}">${esc(c.label)}</th>`)
     .join("")}</tr></thead><tbody></tbody></table></div>`;
 }
 
@@ -167,7 +167,7 @@ function overview() {
 
   if (live?.kind === "cwl") {
     const where = cwl?.position ? `<small>${ordinal(cwl.position)} of ${cwl.clans} in the group</small>` : "";
-    html += `<h2>CWL, round ${live.round} ${where}</h2>${scoreboard(live, "#/cwl")}`;
+    html += `<h2>CWL, round ${live.round} ${where}</h2>${scoreboard(live, `#/cwl/${live.round}`)}`;
   } else if (live) {
     html += `<h2>${live.state === "warEnded" ? "Last war" : "This war"}</h2>${scoreboard(live, "#/war")}`;
   }
@@ -215,6 +215,8 @@ function cwlPage(a, b) {
   return sub(false) + (a ? roundPage(+a) : seasonPage());
 }
 
+// The CWL tab: the season at a glance, a big way into the war on now, then the group, the rounds
+// and every member's stars round by round.
 function seasonPage() {
   const c = DATA.cwl, live = DATA.war?.kind === "cwl" ? DATA.war : null;
   if (!c && !live) return `<p class="empty">No CWL recorded yet.</p>`;
@@ -229,30 +231,69 @@ function seasonPage() {
       [`${tally("W")}–${tally("T")}–${tally("L")}`, "won · tied · lost"],
     ]);
   }
-  if (live) {
-    html += `<h2>Round ${live.round} <small>${live.state === "inWar" ? "battle day" : "preparation day"}</small></h2>${scoreboard(live)}${warBody(live)}`;
+  if (live) html += warButton(live);
+  if (!c) return html;
+
+  const group = c.standings?.length ? `<section><h2>Group</h2><div class="sheet"><table class="group"><thead><tr>
+      <th>#</th><th>Clan</th><th class="num">Stars</th><th class="num">Destruction</th></tr></thead><tbody>${c.standings.map((s, i) => `
+      <tr class="${s.us ? "us" : ""}"><td><span class="rank ${i ? "" : "r1"}">${i + 1}</span></td><td dir="auto">${esc(s.name)}</td>
+      <td class="num"><b>${num(s.stars)}</b> ${star}</td><td class="num muted">${num(s.destruction)}%</td></tr>`).join("")}</tbody></table></div></section>` : "";
+  const rounds = `<section><h2>Rounds</h2><div class="fixtures">${c.rounds.map((r) => {
+    const prep = r.state === "preparation";
+    return `<a href="#/cwl/${r.round}"><span class="rd">R${r.round}</span>${res(result(r))}<span class="opp" dir="auto">${esc(r.opponent)}</span>
+      <span class="sc">${prep ? "" : `${r.stars[0]}–${r.stars[1]}`}</span><span class="pc">${prep ? "" : `${Math.round(r.pct[0])}% – ${Math.round(r.pct[1])}%`}</span></a>`;
+  }).join("")}</div></section>`;
+  html += `<div class="cols">${group}${rounds}</div>`;
+
+  // Members x rounds: the stars each member got in each round.
+  const totals = new Map(c.members.map((m) => [m.tag, m]));
+  const people = new Map();
+  for (const r of c.rounds) {
+    for (const m of r.lineup) {
+      const p = people.get(m.tag) || { tag: m.tag, name: m.name, th: m.th, cells: {} };
+      p.cells[r.round] = m.attacks.length ? m.attacks[0].stars : { warEnded: "missed", inWar: "pending", preparation: "in" }[r.state];
+      people.set(m.tag, p);
+    }
   }
-  if (c) {
-    html += `<h2>Rounds</h2><div class="fixtures">${c.rounds.map((r) => {
-      const prep = r.state === "preparation";
-      return `<a href="#/cwl/${r.round}"><span class="rd">R${r.round}</span>${res(result(r))}<span class="opp">${esc(r.opponent)}</span>
-        <span class="sc">${prep ? "" : `${r.stars[0]}–${r.stars[1]}`}</span><span class="pc">${prep ? "" : `${Math.round(r.pct[0])}% – ${Math.round(r.pct[1])}%`}</span></a>`;
-    }).join("")}</div>`;
-    html += `<h2>Members</h2><p class="note">Finished rounds only, like the in-game Clan tab.</p>` + table(c.members, [
-      { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(MEMBERS.get(m.tag)?.th, "small")} ${who(m.tag, m.name)}` },
+  const rows = [...people.values()].map((p) => ({ ...p, ...(totals.get(p.tag) || { stars: 0, destruction: 0, attacks: 0, wars: 0 }) }));
+  const cell = (v) => (typeof v === "number" ? `<span class="cell s${v}">${v}</span>`
+    : v === "missed" ? `<span class="cell missed" title="Missed">✗</span>`
+    : v === "pending" ? `<span class="cell later" title="Hasn't attacked yet">…</span>`
+    : v === "in" ? `<span class="cell later" title="In the line-up">•</span>` : "");
+  html += `<h2>Members</h2><p class="note">Stars in each round (✗ missed, … still to attack, • in the next line-up). Totals count finished rounds, like the in-game Clan tab.</p>`
+    + table(rows, [
+      { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th, "small")} ${who(m.tag, m.name)}` },
+      ...c.rounds.map((r) => ({
+        label: `R${r.round}`, key: (m) => (typeof m.cells[r.round] === "number" ? m.cells[r.round] : -1), html: (m) => cell(m.cells[r.round]), center: true,
+      })),
       { label: "Stars", key: (m) => m.stars, html: (m) => `<b>${m.stars}</b> ${star}`, num: true },
       { label: "Destruction", key: (m) => m.destruction, html: (m) => `${num(Math.round(m.destruction))}%`, num: true },
-      { label: "Attacks", key: (m) => m.attacks, html: (m) => `${m.attacks}/${m.wars}`, num: true },
-    ], 1);
-  }
+      { label: "Hits", key: (m) => m.attacks, html: (m) => `${m.attacks}/${m.wars}`, num: true },
+    ], c.rounds.length + 1, -1, () => "", "grid");
   return html;
+}
+
+// A big link into the war on now.
+function warButton(w) {
+  const prep = w.state === "preparation";
+  const when = prep ? `preparation · battle starts in ${until(w.start)}` : `battle day · ends in ${until(w.end)}`;
+  const left = w.us.total - w.us.used;
+  return `<a class="war-button" href="#/cwl/${w.round}">
+    <span class="wb-what">Round ${w.round} is ${prep ? "coming up" : "on now"} · ${when}</span>
+    <span class="wb-vs">vs <span dir="auto">${esc(w.them.name)}</span></span>
+    <span class="wb-score">${prep ? "" : `${w.us.stars}${star}${w.them.stars}`}</span>
+    <span class="wb-note">${prep ? "Line-up is set" : left ? `${left} attack${left > 1 ? "s" : ""} left` : "Everyone has attacked"}</span>
+    <span class="wb-go">Open the war <span aria-hidden="true">→</span></span>
+  </a>`;
 }
 
 function roundPage(n) {
   const c = DATA.cwl, live = DATA.war?.kind === "cwl" && DATA.war.round === n ? DATA.war : null;
   const r = c?.rounds.find((x) => x.round === n);
-  let html = `<a class="back" href="#/cwl">← ${c ? seasonName(c.season) : "This season"}</a>`;
-  if (live) return html + `<h2>Round ${n}</h2>${scoreboard(live)}${warBody(live)}`;
+  const has = (k) => c?.rounds.some((x) => x.round === k);
+  let html = `<div class="roundnav"><a href="#/cwl">← ${c ? seasonName(c.season) : "This season"}</a><span>
+    ${has(n - 1) ? `<a href="#/cwl/${n - 1}">‹ Round ${n - 1}</a>` : ""}${has(n + 1) ? `<a href="#/cwl/${n + 1}">Round ${n + 1} ›</a>` : ""}</span></div>`;
+  if (live) return html + `<h2>Round ${n} <small>vs ${esc(live.them.name)}</small></h2>${scoreboard(live)}${warBody(live)}`;
   if (!r) return html + `<p class="empty">No such round.</p>`;
   const used = r.lineup.reduce((s, m) => s + m.attacks.length, 0);
   const w = {
@@ -260,26 +301,25 @@ function roundPage(n) {
     us: { name: DATA.clan.name, badge: DATA.clan.badge, stars: r.stars[0], pct: r.pct[0], size: r.lineup.length, used, total: r.lineup.length },
     them: { name: r.opponent, badge: null, stars: r.stars[1], pct: r.pct[1], size: r.lineup.length, used: null, total: r.lineup.length },
   };
-  return html + `<h2>Round ${n}</h2>${scoreboard(w)}${warBody(w)}`;
+  return html + `<h2>Round ${n} <small>vs ${esc(r.opponent)}</small></h2>${scoreboard(w)}${warBody(w)}`;
 }
 
 const PERFECT_MARK = `<span class="perfect" title="21 stars from 7 attacks">perfect</span>`;
 
+// A member's CWL record over every season we have: perfect seasons (21 stars from 7 attacks), how
+// many in a row up to the latest finished one, and how many seasons they made the board.
+function cwlRecord(tag) {
+  const h = DATA.cwl_history, p = h?.perfect.find((x) => x.tag === tag);
+  const rows = (h?.seasons || []).flatMap((s) => s.rows.filter((r) => r.tag === tag).map((r) => ({ ...r, s })));
+  return { perfect: p?.perfect || 0, streak: p?.streak || 0, shown: rows.filter((r) => r.s.done).length, rows };
+}
+
 function historyPage() {
   const h = DATA.cwl_history;
   if (!h?.seasons.length) return `<p class="empty">No past seasons yet.</p>`;
-  let html = `<h2>Perfect CWLs</h2>
-    <p class="note">Seven attacks, seven three-stars: 21 stars. Counted over the ${h.counted} finished seasons we have.
-    Names in grey aren't in the clan now (or the bot never saw them).</p>`;
-  html += table(h.perfect, [
-    { label: "Member", key: (p) => p.name.toLowerCase(), html: (p) => `${th(MEMBERS.get(p.tag)?.th, "small")} ${who(p.tag, p.name)}` },
-    { label: "Perfect", key: (p) => p.perfect, html: (p) => `<b>${p.perfect}</b>`, num: true },
-    { label: "In a row now", key: (p) => p.streak, html: (p) => (p.streak ? p.streak : `<span class="muted">–</span>`), num: true },
-    { label: "Seasons on the board", key: (p) => p.shown, html: (p) => p.shown, num: true },
-  ], 1, -1, (p) => (MEMBERS.has(p.tag) ? "" : "left"));
-
-  html += `<h2>Seasons</h2>
-    <p class="note">Older seasons come from the leaderboard screenshots posted in our Discord, which only show the top of the board. The bot has recorded every member since October 2026.</p>`;
+  let html = `<h2>Seasons</h2>
+    <p class="note">Older seasons come from the leaderboard screenshots posted in our Discord, which only show the top of the board.
+    The bot has recorded every member since October 2026. Each member's perfect CWLs are on the <a class="link" href="#/members">Members</a> list and their own page.</p>`;
   html += table(h.seasons, [
     { label: "Season", key: (s) => s.season, html: (s) => `<a class="link" href="#/cwl/history/${encodeURIComponent(s.season)}">${esc(s.label)}</a>` },
     { label: "Perfect", key: (s) => s.rows.filter((r) => r.perfect).length, html: (s) => (s.done ? num(s.rows.filter((r) => r.perfect).length) : `<span class="muted">–</span>`), num: true },
@@ -343,7 +383,8 @@ function streaksPage(order) {
 }
 
 function membersPage() {
-  return `<h2>${num(DATA.members.length)} members</h2>` + table(DATA.members, [
+  const rows = DATA.members.map((m) => ({ ...m, cwl: cwlRecord(m.tag) }));
+  return `<h2>${num(DATA.members.length)} members</h2>` + table(rows, [
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
@@ -352,6 +393,8 @@ function membersPage() {
     { label: "Total tracked", key: (m) => m.donations_total ?? -1, html: (m) => `<span class="muted">${m.donations_total == null ? "–" : num(m.donations_total)}</span>`, num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
     { label: "Defense held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
+    { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>` : `<span class="muted">–</span>`), num: true },
+    { label: "In a row", key: (m) => m.cwl.streak, html: (m) => (m.cwl.streak ? m.cwl.streak : `<span class="muted">–</span>`), num: true },
   ], 2);
 }
 
@@ -406,10 +449,15 @@ function playerPage(tag) {
       d.attacked && [num(d.attacked), "times attacked"],
     ]);
   }
-  const seasons = (DATA.cwl_history?.seasons || []).flatMap((s) => s.rows.filter((r) => r.tag === tag).map((r) => ({ ...r, s })));
+  const rec = cwlRecord(tag), seasons = rec.rows;
   if (seasons.length) {
-    const perfect = seasons.filter((r) => r.perfect).length;
-    html += `<h2>CWL seasons ${perfect ? `<small>${perfect} perfect</small>` : ""}</h2>` + table(seasons, [
+    const best = Math.min(...seasons.map((r) => r.position));
+    html += `<h2>CWL seasons</h2>` + ledger([
+      [`<span class="perfect-n">${num(rec.perfect)}</span>`, "perfect CWLs", "gold"],
+      [num(rec.streak), "perfect in a row now"],
+      [num(rec.shown), "seasons on the board"],
+      [ordinal(best), "best place"],
+    ]) + `<p class="note">A perfect CWL is seven attacks, seven three-stars: 21 stars. Older seasons come from leaderboard screenshots, which only show the top of the board.</p>` + table(seasons, [
       { label: "Season", key: (r) => r.s.season, html: (r) => `<a class="link" href="#/cwl/history/${encodeURIComponent(r.s.season)}">${esc(r.s.label)}</a>${r.perfect ? ` ${PERFECT_MARK}` : ""}` },
       { label: "Place", key: (r) => -r.position, html: (r) => `<span class="muted">${ordinal(r.position)}</span>`, num: true },
       { label: "Stars", key: (r) => r.stars, html: (r) => `<b>${r.stars}</b> ${star}`, num: true },
