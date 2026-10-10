@@ -37,6 +37,8 @@ const RESULT = { W: "Won", L: "Lost", T: "Tied", inWar: "Live", preparation: "Pr
 const res = (r) => `<span class="res ${r}">${RESULT[r] || ""}</span>`;
 // The Clash of Clans war icon: two crossed swords. Marks links that open a war.
 const SWORDS = `<svg class="swords" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g transform="rotate(45 32 32)"><path class="bl" d="M32 3L37.5 11V41h-11V11Z"/><path class="fu" d="M32 10V38"/><rect class="gd" x="19" y="40" width="26" height="6.5" rx="3.2"/><rect class="gr" x="28.8" y="46.5" width="6.4" height="10" rx="1.6"/><circle class="gd" cx="32" cy="59" r="3.8"/></g><g transform="rotate(-45 32 32)"><path class="bl" d="M32 3L37.5 11V41h-11V11Z"/><path class="fu" d="M32 10V38"/><rect class="gd" x="19" y="40" width="26" height="6.5" rx="3.2"/><rect class="gr" x="28.8" y="46.5" width="6.4" height="10" rx="1.6"/><circle class="gd" cx="32" cy="59" r="3.8"/></g></svg>`;
+// A regular-war hit on a base that was already three-starred: shown, but not counted in stats.
+const FREE_HIT = `<span class="free" title="That base was already three-starred, so this hit doesn't count in stats">free hit</span>`;
 // A player's name, linked to their page while they're in the clan.
 const who = (tag, name) => (tag && MEMBERS.has(tag) ? `<a href="#/player/${encodeURIComponent(tag)}">${esc(name)}</a>` : esc(name));
 const names = (items) => `<p class="names">${items.map((x) => `<span class="n">${x}</span>`).join("")}</p>`;
@@ -153,7 +155,7 @@ function lineupTable(lineup, pending) {
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th)} ${who(m.tag, m.name)}` },
     {
       label: "Attacks", key: (m) => m.attacks.reduce((s, a) => s + a.stars, 0),
-      html: (m) => (m.attacks.length ? m.attacks.map((a) => `<span class="muted">→ #${a.pos ?? "?"}</span> ${th(a.th, "small")} ${stars(a.stars)} <b class="${a.pct >= 100 ? "gold" : ""}">${Math.round(a.pct)}%</b>`).join("<br>") : `<span class="muted">${pending}</span>`),
+      html: (m) => (m.attacks.length ? m.attacks.map((a) => `<span class="muted">→ #${a.pos ?? "?"}</span> ${th(a.th, "small")} ${stars(a.stars)} <b class="${a.pct >= 100 ? "gold" : ""}">${Math.round(a.pct)}%</b>${a.free ? ` ${FREE_HIT}` : ""}`).join("<br>") : `<span class="muted">${pending}</span>`),
     },
     {
       label: "Defense", key: (m) => -m.defense.stars,
@@ -174,8 +176,8 @@ function warBody(w) {
     w.them.used != null && [num(w.them.total - w.them.used), live ? "enemy attacks left" : "enemy attacks missed"],
   ]);
   if (w.state === "warEnded") {  // the recap: best attackers and the bases that held
-    const scored = w.lineup.filter((m) => m.attacks.length).map((m) => ({
-      m, s: m.attacks.reduce((t, a) => t + a.stars, 0), d: m.attacks.reduce((t, a) => t + a.pct, 0), x: m.attacks.filter((a) => a.stars === 3).length,
+    const scored = w.lineup.map((m) => ({ m, hits: m.attacks.filter((a) => !a.free) })).filter((x) => x.hits.length).map(({ m, hits }) => ({
+      m, s: hits.reduce((t, a) => t + a.stars, 0), d: hits.reduce((t, a) => t + a.pct, 0), x: hits.filter((a) => a.stars === 3).length,
     })).sort((a, b) => b.s - a.s || b.d - a.d).slice(0, 3);
     if (scored.length) html += `<h3>Best attacks</h3>` + names(scored.map(({ m, s, x }) => `${th(m.th, "small")} ${who(m.tag, m.name)} <b>${s}</b>${star}${x > 1 ? ` <span class="muted">${x} triples</span>` : ""}`));
     if (held.length) html += `<h3>Held (${held.length})</h3>` + names(held.map((m) => `${th(m.th, "small")} ${who(m.tag, m.name)}`));
@@ -537,7 +539,8 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
   });
   return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${NOT_WARS.has(metric) ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
     <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, fmt(v), d]))}
-    <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.</p>`;
+    <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.
+    In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
 
 function playerPage(tag) {
@@ -591,7 +594,7 @@ function playerPage(tag) {
   if (m.history?.length) html += `<h2>In the clan</h2>` + newsList(m.history.map((e) => ({ ...e, tag })));
   if (m.recent.length) {
     html += `<h2>Recent attacks</h2>` + table(m.recent, [
-      { label: "Result", key: null, html: (a) => `${stars(a.stars)} <b>${Math.round(a.pct)}%</b>` },
+      { label: "Result", key: null, html: (a) => `${stars(a.stars)} <b>${Math.round(a.pct)}%</b>${a.free ? ` ${FREE_HIT}` : ""}` },
       { label: "Target", key: null, html: (a) => (a.pos ? `<span class="muted">#${a.pos}</span> ${th(a.th, "small")}` : "?") },
       { label: "War", key: null, html: (a) => `<span class="muted">${a.kind === "cwl" ? `CWL round ${a.round}` : "War"} vs</span> ${esc(a.opponent)}` },
       { label: "Date", key: null, html: (a) => `<span class="muted">${when(a.start)}</span>`, num: true },
