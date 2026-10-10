@@ -200,8 +200,8 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
 .ranks .value .unit { font: 400 13px var(--text); margin-left: 2px; }
 
 /* Leaders-only parts of a public page (signed-in admin), set apart so they're never mistaken for it. */
-.leader { margin-top: 28px; padding: 4px 18px 18px; background: var(--paper-2); border-left: 3px solid var(--accent); }
-.leader > h3:first-child { color: var(--accent); }
+.leaders-only { margin-top: 28px; padding: 4px 18px 18px; background: var(--paper-2); border-left: 3px solid var(--accent); }
+.leaders-only > h3:first-child { color: var(--accent); }
 
 /* Names in running text instead of pills. */
 .names { line-height: 2.1; max-width: none; }
@@ -410,6 +410,6 @@ input[type="search"] {
   td, th { padding-left: 7px; padding-right: 7px; }
   .lede { font-size: 20px; }
   .player-head h2 { font-size: 30px; }
-  .leader { padding: 2px 12px 14px; }
+  .leaders-only { padding: 2px 12px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

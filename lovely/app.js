@@ -846,7 +846,7 @@ function leaderBox(tag) {
   // The log here is what the public page doesn't show: leaves, demotions, warnings, and who did it.
   const strikes = LEADER.strikes.filter((s) => s.tag === tag);
   const log = LEADER.log.filter((e) => e.tag === tag && (e.by || !["join", "rejoin", "promote", "th", "rename", "milestone"].includes(e.kind)));
-  let html = `<section class="leader"><h3>Leaders only</h3>`;
+  let html = `<section class="leaders-only"><h3>Leaders only</h3>`;
   if (r) {
     html += ledger([
       [played(r), "last played", r.quiet >= 7 ? "loss" : ""],
