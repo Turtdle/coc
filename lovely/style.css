@@ -189,6 +189,20 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
 .perfect-n { color: var(--accent); font-weight: 600; }
 [dir="auto"] { unicode-bidi: plaintext; text-align: left; }
 
+/* Clan news and the member log: the date, then what happened. */
+.news { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.news li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: baseline;
+           padding: 8px 2px; border-bottom: 1px solid var(--rule); }
+.news .d { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.news b { font-weight: 600; }
+.news img.th { vertical-align: -4px; }
+.news .by { color: var(--muted); font-size: 13px; }
+.ranks .value .unit { font: 400 13px var(--text); margin-left: 2px; }
+
+/* Leaders-only parts of a public page (signed-in admin), set apart so they're never mistaken for it. */
+.leader { margin-top: 28px; padding: 4px 18px 18px; background: var(--paper-2); border-left: 3px solid var(--accent); }
+.leader > h3:first-child { color: var(--accent); }
+
 /* Names in running text instead of pills. */
 .names { line-height: 2.1; max-width: none; }
 .names .n { white-space: nowrap; }
@@ -396,5 +410,6 @@ input[type="search"] {
   td, th { padding-left: 7px; padding-right: 7px; }
   .lede { font-size: 20px; }
   .player-head h2 { font-size: 30px; }
+  .leader { padding: 2px 12px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

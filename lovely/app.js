@@ -1,6 +1,7 @@
 // Lovely clan mini site. Reads data.json (rebuilt hourly by the clan bot) and renders
-// everything client-side with hash routes: #/overview, #/members, #/war, #/cwl, #/cwl/<round>,
-// #/cwl/history, #/cwl/history/<season>, #/streaks, #/streaks/top, #/leaderboards, #/player/<tag>.
+// everything client-side with hash routes: #/overview, #/news, #/members, #/war, #/war/<start>, #/cwl,
+// #/cwl/<round>, #/cwl/history, #/cwl/history/<season>, #/streaks, #/streaks/top, #/leaderboards,
+// #/player/<tag>; and, for the signed-in admin only, #/leaders[/log|/strikes] and #/chat.
 //
 // data.json's "war" is whatever war is on right now, a regular war or a CWL round (the
 // turtdle.github.io homepage reads it too). The War tab only shows regular wars ("war" when
@@ -42,6 +43,31 @@ const names = (items) => `<p class="names">${items.map((x) => `<span class="n">$
 // Figures in a row between rules: [[value html, label, class], ...]; falsy entries are skipped.
 const ledger = (items, cls = "") => `<div class="ledger ${cls}"><div class="in">${items.filter(Boolean)
   .map(([value, label, cls = ""]) => `<div><b class="${cls}">${value}</b><span>${esc(label)}</span></div>`).join("")}</div></div>`;
+
+// Member events: [{ts, tag, name, kind, old, new, by?}]. data.json only has the good news (joins,
+// promotions, Town Hall upgrades, renames, milestones); the admin side adds leaves, demotions and
+// warnings, with who did it.
+function eventText(e) {
+  const n = `<b>${who(e.tag, e.name)}</b>`, role = (r) => esc(ROLES[r] || r || "?");
+  const text = {
+    join: () => `${n} joined the clan ${th(e.new, "small")}`,
+    rejoin: () => `${n} came back to the clan`,
+    leave: () => `${n} left the clan`,
+    promote: () => `${n} was promoted to ${role(e.new)}`,
+    demote: () => `${n} was demoted to ${role(e.new)}`,
+    th: () => `${n} upgraded to Town Hall ${esc(e.new)} ${th(e.new, "small")}`,
+    rename: () => `<b>${esc(e.old)}</b> is now called ${n}`,
+    milestone: () => `${n} ${esc(String(e.new || "").replace(/\s*\u2b50\ufe0f?\s*$/, ""))}`,
+    warned: () => `${n} was warned`,
+  }[e.kind];
+  return text ? text() : `${n}: ${esc(e.kind)}`;
+}
+
+function newsList(items, showBy = false) {
+  if (!items.length) return `<p class="empty">Nothing yet.</p>`;
+  return `<ol class="news">${items.map((e) => `<li><span class="d">${when(e.ts)}</span>
+    <span>${eventText(e)}${showBy && e.by ? ` <span class="by">· ${esc(e.by)}</span>` : ""}</span></li>`).join("")}</ol>`;
+}
 
 function result(r) {
   if (r.state !== "warEnded") return ["preparation", "inWar"].includes(r.state) ? r.state : "";
@@ -138,7 +164,7 @@ function lineupTable(lineup, pending) {
 
 // Everything under a war's scoreboard: attacks left, who still has to attack, the line-up.
 function warBody(w) {
-  if (w.state === "preparation") return `<p class="note">Preparation day: attacks open in ${until(w.start)}.</p>`;
+  if (w.state === "preparation") return `<p class="note">${w.start ? `Preparation day: attacks open in ${until(w.start)}.` : "Preparation day: the line-up is set."}</p>`;
   const live = w.state === "inWar";
   const left = w.lineup.filter((m) => m.attacks.length < w.per);
   const hit = w.lineup.filter((m) => m.defense.n), held = hit.filter((m) => m.defense.stars < 3);
@@ -147,6 +173,13 @@ function warBody(w) {
     [hit.length ? `${held.length}<span class="muted">/${hit.length}</span>` : "–", "bases held"],
     w.them.used != null && [num(w.them.total - w.them.used), live ? "enemy attacks left" : "enemy attacks missed"],
   ]);
+  if (w.state === "warEnded") {  // the recap: best attackers and the bases that held
+    const scored = w.lineup.filter((m) => m.attacks.length).map((m) => ({
+      m, s: m.attacks.reduce((t, a) => t + a.stars, 0), d: m.attacks.reduce((t, a) => t + a.pct, 0), x: m.attacks.filter((a) => a.stars === 3).length,
+    })).sort((a, b) => b.s - a.s || b.d - a.d).slice(0, 3);
+    if (scored.length) html += `<h3>Best attacks</h3>` + names(scored.map(({ m, s, x }) => `${th(m.th, "small")} ${who(m.tag, m.name)} <b>${s}</b>${star}${x > 1 ? ` <span class="muted">${x} triples</span>` : ""}`));
+    if (held.length) html += `<h3>Held (${held.length})</h3>` + names(held.map((m) => `${th(m.th, "small")} ${who(m.tag, m.name)}`));
+  }
   if (left.length) {
     const label = live ? "Still to attack" : "Didn't attack";
     html += `<h3>${label} (${left.length})</h3>` + names(left.map((m) => `${th(m.th, "small")} ${who(m.tag, m.name)}${w.per - m.attacks.length > 1 ? ` <span class="muted">×${w.per - m.attacks.length}</span>` : ""}`));
@@ -179,16 +212,37 @@ function overview() {
     .sort((a, b) => b.war.all.triples / b.war.all.attacks - a.war.all.triples / a.war.all.attacks || b.war.all.attacks - a.war.all.attacks).slice(0, 5);
   const donors = DATA.members.filter((m) => m.donations_total).sort((a, b) => b.donations_total - a.donations_total).slice(0, 5);
   const perfect = (DATA.cwl_history?.perfect || []).slice(0, 5);
+  const fastest = DATA.members.filter((m) => m.progress?.gained > 0).sort((a, b) => b.progress.per_week - a.progress.per_week).slice(0, 5);
+  const gamers = DATA.members.filter((m) => m.games?.points > 0).sort((a, b) => b.games.points - a.games.points);
+  const games = DATA.members.find((m) => m.games)?.games;
   html += `<div class="cols">
+    <section><h2>Clan news</h2>${newsList((DATA.news || []).slice(0, 6))}
+      ${(DATA.news || []).length > 6 ? `<p class="note"><a class="link" href="#/news">All the news</a></p>` : ""}</section>
     <section><h2>Best 3-star rate</h2>${rankList(war3.map((m) => [m, pct(m.war.all.triples / m.war.all.attacks), `${m.war.all.attacks} attacks`]))}</section>
     <section><h2>Top donors</h2>${rankList(donors.map((m) => [m, num(m.donations_total), `got ${num(m.received_total)}`]))}</section>
     ${perfect.length ? `<section><h2>Perfect CWLs</h2>${rankList(perfect.map((p) => [p, num(p.perfect), p.streak > 1 ? `${p.streak} in a row` : `of ${p.shown} seasons`]))}
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
+    <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, `${m.progress.per_week}<span class="muted unit">/wk</span>`, `+${num(m.progress.gained)} levels in ${m.progress.days} days`]))}
+      <p class="note">Hero, troop, spell and equipment levels gained a week. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
+    <section><h2>Clan Games ${games ? `<small>${gameDates(games)}</small>` : ""}</h2>
+      ${rankList(gamers.slice(0, 5).map((m) => [m, num(m.games.points), games.ongoing ? "so far" : ""]))}
+      ${gamers.length ? `<p class="note">${num(gamers.reduce((t, m) => t + m.games.points, 0))} points from ${num(gamers.length)} members. <a class="link" href="#/leaderboards/games">Everyone</a></p>` : ""}</section>
   </div>`;
   return html;
 }
 
-function warPage() {
+const gameDates = (g) => {
+  const day = (iso, opts) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, opts);
+  return `${day(g.start, { month: "short", day: "numeric" })}–${day(g.end, { day: "numeric" })}${g.ongoing ? ", on now" : ""}`;
+};
+
+function newsPage() {
+  return `<h2>Clan news <small>the last 60 days</small></h2>${newsList(DATA.news || [])}
+    <p class="note">Joins, promotions, Town Hall upgrades and war-star milestones, from the member list our clan bot reads every few minutes.</p>`;
+}
+
+function warPage(start) {
+  if (start) return pastWar(+start);
   const live = DATA.war, w = live?.kind === "regular" ? live : DATA.last_war;
   let html = "";
   if (live?.kind === "cwl") {
@@ -203,13 +257,27 @@ function warPage() {
     html += `<h2>War log</h2>` + table(DATA.regular_wars, [
       { label: "Ended", key: (r) => r.end, html: (r) => `<span class="muted">${when(r.end) || "–"}</span>` },
       { label: "Result", key: null, html: (r) => res(result(r)) },
-      { label: "Opponent", key: (r) => r.opponent.toLowerCase(), html: (r) => esc(r.opponent) },
+      { label: "Opponent", key: (r) => r.opponent.toLowerCase(), html: (r) => (r.lineup ? `<a class="link" href="#/war/${r.start}">${esc(r.opponent)}</a>` : esc(r.opponent)) },
       { label: "Size", key: (r) => r.size, html: (r) => `${r.size} v ${r.size}`, num: true },
       { label: "Stars", key: (r) => r.stars[0] - r.stars[1], html: (r) => `<b>${r.stars[0]}</b> – ${r.stars[1]}`, num: true },
       { label: "Destruction", key: (r) => r.pct[0], html: (r) => `${r.pct[0].toFixed(1)}% <span class="muted">– ${r.pct[1].toFixed(1)}%</span>`, num: true },
     ], 0);
   }
   return html;
+}
+
+// A finished regular war from the war log, with its recap and line-up.
+function pastWar(start) {
+  const r = (DATA.regular_wars || []).find((x) => x.start === start);
+  const html = `<a class="back" href="#/war">← War</a>`;
+  if (!r?.lineup) return html + `<p class="empty">That war's line-up isn't on record.</p>`;
+  const used = r.lineup.reduce((s, m) => s + m.attacks.length, 0);
+  const w = {
+    state: r.state, kind: "regular", round: null, per: r.per, start: r.start, end: r.end, lineup: r.lineup,
+    us: { name: DATA.clan.name, badge: DATA.clan.badge, stars: r.stars[0], pct: r.pct[0], size: r.size, used, total: r.size * r.per },
+    them: { name: r.opponent, badge: null, stars: r.stars[1], pct: r.pct[1], size: r.size, used: null, total: r.size * r.per },
+  };
+  return html + `<h2>${res(result(r))} <span dir="auto">vs ${esc(r.opponent)}</span> <small>${when(r.end, { month: "short", day: "numeric", year: "numeric" })}</small></h2>${scoreboard(w)}${warBody(w)}`;
 }
 
 function cwlPage(a, b) {
@@ -235,6 +303,7 @@ function seasonPage() {
     ]);
   }
   if (live) html += warButton(live);
+  if (c?.scout) html += `<p class="aside">Next up: round ${c.scout.round} against <b dir="auto">${esc(c.scout.opponent)}</b>. <a class="link" href="#/cwl/${c.scout.round}">Scout their line-up</a></p>`;
   if (!c) return html;
 
   const group = c.standings?.length ? `<section><h2>Group</h2><div class="sheet"><table class="group"><thead><tr>
@@ -296,7 +365,8 @@ function roundPage(n) {
   const has = (k) => c?.rounds.some((x) => x.round === k);
   let html = `<div class="roundnav"><a href="#/cwl">← ${c ? seasonName(c.season) : "This season"}</a><span>
     ${has(n - 1) ? `<a href="#/cwl/${n - 1}">‹ Round ${n - 1}</a>` : ""}${has(n + 1) ? `<a href="#/cwl/${n + 1}">Round ${n + 1} ›</a>` : ""}</span></div>`;
-  if (live) return html + `<h2>Round ${n} <small>vs ${esc(live.them.name)}</small></h2>${scoreboard(live)}${warBody(live)}`;
+  const scouting = c?.scout?.round === n ? scoutTable(c.scout) : "";
+  if (live) return html + `<h2>Round ${n} <small>vs ${esc(live.them.name)}</small></h2>${scoreboard(live)}${warBody(live)}${scouting}`;
   if (!r) return html + `<p class="empty">No such round.</p>`;
   const used = r.lineup.reduce((s, m) => s + m.attacks.length, 0);
   const w = {
@@ -304,7 +374,19 @@ function roundPage(n) {
     us: { name: DATA.clan.name, badge: DATA.clan.badge, stars: r.stars[0], pct: r.pct[0], size: r.lineup.length, used, total: r.lineup.length },
     them: { name: r.opponent, badge: null, stars: r.stars[1], pct: r.pct[1], size: r.lineup.length, used: null, total: r.lineup.length },
   };
-  return html + `<h2>Round ${n} <small>vs ${esc(r.opponent)}</small></h2>${scoreboard(w)}${warBody(w)}`;
+  return html + `<h2>Round ${n} <small>vs ${esc(r.opponent)}</small></h2>${scoreboard(w)}${warBody(w)}${scouting}`;
+}
+
+// The next CWL opponent's line-up, with how each of them has done in earlier rounds this season.
+function scoutTable(s) {
+  const head = `<h2>Scouting <span dir="auto">${esc(s.opponent)}</span></h2>`;
+  if (!s.rows.length) return head + `<p class="note">Their line-up shows up here when preparation day starts.</p>`;
+  return head + `<p class="note">Their earlier rounds this season (the bot records every war in our group). Held means the base wasn't three-starred.</p>` + table(s.rows, [
+    { label: "#", key: (r) => r.pos, html: (r) => `<span class="muted">${r.pos}</span>` },
+    { label: "Base", key: (r) => r.name.toLowerCase(), html: (r) => `${th(r.th)} <span dir="auto">${esc(r.name)}</span>` },
+    { label: "Their attacks", key: (r) => (r.hits ? r.stars / r.hits : -1), html: (r) => (r.hits ? `<b>${r.stars}</b> ${star} <span class="muted">${r.triples}×3 · ${r.hits} hit${r.hits > 1 ? "s" : ""}</span>` : `<span class="muted">no hits yet</span>`), num: true },
+    { label: "Their defense", key: (r) => (r.defended ? r.held / r.defended : -1), html: (r) => (r.defended ? `<span class="${r.held ? "win" : ""}">held ${r.held}/${r.defended}</span>` : `<span class="muted">not attacked yet</span>`), num: true },
+  ], 0, 1);
 }
 
 const PERFECT_MARK = `<span class="perfect" title="21 stars from 7 attacks">perfect</span>`;
@@ -453,7 +535,9 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
 function playerPage(tag) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
-  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}</p></div></div>`;
+  const since = m.joined ? ` · in the clan since ${when(m.joined, { month: "short", day: "numeric", year: "numeric" })}` : "";
+  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
+  if (ADMIN) html += leaderBox(tag);
   html += ledger([
     m.donations_total != null && [num(m.donations_total), `donated since ${when(m.tracked_since)}`, "gold"],
     m.donations_total != null && [num(m.received_total), "received"],
@@ -496,6 +580,7 @@ function playerPage(tag) {
       { label: "Attacks", key: (r) => r.attacks, html: (r) => `${r.attacks}/${r.available}`, num: true },
     ], 0);
   }
+  if (m.history?.length) html += `<h2>In the clan</h2>` + newsList(m.history.map((e) => ({ ...e, tag })));
   if (m.recent.length) {
     html += `<h2>Recent attacks</h2>` + table(m.recent, [
       { label: "Result", key: null, html: (a) => `${stars(a.stars)} <b>${Math.round(a.pct)}%</b>` },
@@ -556,7 +641,9 @@ function setupViewer() {
 const ADMIN_HOST = "lovelycoc.com";
 let ADMIN = null;  // {user} once signed in
 let CHAT = null;   // {rows, checked}
+let LEADER = null; // bot/leaders.py's report: {housekeeping, log, strikes, seeded}
 const chatView = { find: "", who: "" };
+const leaderView = { how: "all", kind: "", find: "" };
 
 async function checkAdmin() {
   if (location.hostname !== ADMIN_HOST) return;
@@ -569,7 +656,7 @@ async function checkAdmin() {
 function adminFooter() {
   const here = location.hostname === ADMIN_HOST;
   if (!ADMIN) return `<p class="admin"><a href="${here ? "" : `https://${ADMIN_HOST}/`}#/admin" rel="nofollow">admin</a></p>`;
-  return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/chat">chat log</a> ·
+  return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/leaders">leaders</a> · <a href="#/chat">chat log</a> ·
     <button type="button" id="signout">sign out</button></p>`;
 }
 
@@ -589,7 +676,7 @@ function setupAdmin() {
 // The sign-in form: username, password and the 6-digit code from the authenticator app.
 function adminPage() {
   if (location.hostname !== ADMIN_HOST) return `<p class="empty">Sign in on <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>.</p>`;
-  if (ADMIN) { setTimeout(() => { location.hash = "#/chat"; }); return ""; }
+  if (ADMIN) { setTimeout(() => { location.hash = "#/leaders"; }); return ""; }
   setTimeout(() => {
     const form = document.getElementById("signin");
     if (!form) return;
@@ -603,7 +690,7 @@ function adminPage() {
           username: form.username.value, password: form.password.value, code: form.code.value,
         });
         if (r.ok) {
-          location.hash = "#/chat";
+          location.hash = "#/leaders";
           location.reload();
           return;
         }
@@ -634,6 +721,144 @@ async function loadChat() {
     CHAT = { rows: [], error: "Couldn't load the chat." };
   }
   if (location.hash.startsWith("#/chat")) route();
+}
+
+async function loadLeader() {
+  if (loadLeader.busy) return;
+  loadLeader.busy = true;
+  try {
+    const r = await fetch("/admin/api/leader", { credentials: "same-origin", cache: "no-store" });
+    LEADER = r.ok ? await r.json() : { error: r.status === 401 ? "Your sign-in ran out. Sign in again from the admin link." : "Couldn't load the leaders' data." };
+    if (r.status === 401) ADMIN = null;
+  } catch (e) {
+    LEADER = { error: "Couldn't load the leaders' data." };
+  }
+  loadLeader.busy = false;
+  if (/^#\/(leaders|player)\b/.test(location.hash)) route();
+}
+
+const HK_FILTERS = {
+  all: ["Everyone, most in need of a look first", () => true], quiet: ["Quiet for 7+ days", (r) => r.quiet >= 7],
+  out: ["War preference: out", (r) => r.war === "out"], missed: ["Missed attacks lately", (r) => r.missed > 0],
+  strikes: ["Has strikes (30 days)", (r) => r.strikes > 0], new: ["Joined in the last 14 days", (r) => r.new],
+};
+const LOG_KINDS = {
+  "": ["Everything", () => true], members: ["Joins and leaves", (e) => ["join", "rejoin", "leave"].includes(e.kind)],
+  roles: ["Promotions and demotions", (e) => ["promote", "demote"].includes(e.kind)],
+  upgrades: ["Upgrades, milestones, renames", (e) => ["th", "milestone", "rename"].includes(e.kind)],
+  warned: ["Warnings", (e) => e.kind === "warned"],
+};
+const played = (r) => (r.seen ? (r.quiet < 1 ? "today" : `${Math.round(r.quiet)}d ago`) : `not in ${Math.round(r.quiet)}d`);
+
+// Leaders only (admin.py, never data.json): housekeeping, the full member log and strikes.
+function leadersPage(sub) {
+  if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see this.</p>`;
+  if (!LEADER) { loadLeader(); return `<p class="empty">Loading…</p>`; }
+  if (LEADER.error) return `<p class="empty">${esc(LEADER.error)}</p>`;
+  const nav = `<div class="subnav">${[["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"]]
+    .map(([k, v]) => `<a href="#/leaders${k ? `/${k}` : ""}" class="${(sub || "") === k ? "on" : ""}">${v}</a>`).join("")}</div>`;
+  return nav + (sub === "log" ? memberLogPage() : sub === "strikes" ? strikesPage() : housekeepingPage());
+}
+
+function housekeepingPage() {
+  const rows = LEADER.housekeeping, count = (f) => rows.filter(HK_FILTERS[f][1]).length;
+  const since = LEADER.seeded ? when(LEADER.seeded, { month: "short", day: "numeric" }) : "the start";
+  setTimeout(() => {
+    const pick = document.getElementById("hkhow");
+    if (!pick) return;
+    pick.value = leaderView.how;
+    pick.addEventListener("change", () => { leaderView.how = pick.value; document.getElementById("hk").innerHTML = hkTable(); });
+  });
+  return `<h2>Housekeeping <small>${num(rows.length)} members · only you see this</small></h2>` + ledger([
+    [num(count("quiet")), "quiet 7+ days", count("quiet") ? "loss" : ""],
+    [num(count("out")), "war preference out"],
+    [num(count("missed")), "missed attacks lately", count("missed") ? "loss" : ""],
+    [num(count("strikes")), "with strikes (30 days)"],
+    [num(count("new")), "joined in 14 days"],
+  ]) + `<div class="controls"><select id="hkhow" aria-label="Show">${Object.entries(HK_FILTERS).map(([k, [v]]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+    <div id="hk">${hkTable()}</div>
+    <p class="note">Last played is worked out from the API (donations, XP, war attacks, builder base), since the game has no "last online"; it's only kept for current members.
+    Missed counts the clan's last 10 wars. Donated and war preference come from the daily profile check. Time in the clan counts from ${esc(since)} for anyone already here then.
+    Give a warning with <b>/housekeeping</b> in Discord.</p>`;
+}
+
+function hkTable() {
+  const rows = LEADER.housekeeping.filter(HK_FILTERS[leaderView.how][1]);
+  if (!rows.length) return `<p class="empty">Nobody.</p>`;
+  return table(rows, [
+    { label: "Member", key: (r) => r.name.toLowerCase(), html: (r) => `${th(r.th, "small")} ${who(r.tag, r.name)} <span class="role ${esc(r.role)}">${ROLES[r.role] || ""}</span>` },
+    { label: "Last played", key: (r) => -r.quiet, html: (r) => `<span class="${r.quiet >= 7 ? "loss" : r.seen ? "" : "muted"}">${played(r)}</span>` },
+    { label: "War", key: (r) => (r.war === "out" ? 0 : 1), html: (r) => (r.war === "out" ? `<span class="loss">out</span>` : r.war ? "in" : `<span class="muted">–</span>`) },
+    { label: "Missed", key: (r) => r.missed, html: (r) => (r.wars ? `<span class="${r.missed ? "loss" : "muted"}">${r.missed}/${r.wars}</span>` : `<span class="muted">–</span>`), num: true },
+    { label: "Strikes", key: (r) => r.strikes, html: (r) => (r.strikes ? `<b class="loss">${r.strikes}</b>` : `<span class="muted">0</span>`), num: true },
+    { label: "Donated 30d", key: (r) => r.donated ?? -1, html: (r) => (r.donated == null ? `<span class="muted">–</span>` : num(r.donated)), num: true },
+    { label: "In clan", key: (r) => r.days_in, html: (r) => (r.new ? `<span class="gold">new</span>` : `${Math.round(r.days_in)}d`), num: true },
+  ], null);  // already in "needs a look" order
+}
+
+function memberLogPage() {
+  setTimeout(() => {
+    const kind = document.getElementById("logkind"), find = document.getElementById("logfind");
+    if (!kind) return;
+    kind.value = leaderView.kind;
+    find.value = leaderView.find;
+    const redraw = () => { leaderView.kind = kind.value; leaderView.find = find.value; document.getElementById("log").innerHTML = logList(); };
+    kind.addEventListener("change", redraw);
+    find.addEventListener("input", redraw);
+  });
+  return `<h2>Member log <small>everything, with who did it</small></h2>
+    <div class="controls"><select id="logkind" aria-label="Kind">${Object.entries(LOG_KINDS).map(([k, [v]]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select>
+      <input id="logfind" type="search" placeholder="Find a member" aria-label="Find a member" autocomplete="off"></div>
+    <div id="log">${logList()}</div>
+    <p class="note">From the member list the bot reads every 5 minutes. Who accepted, kicked or promoted someone comes from the clan chat, a few hours later.</p>`;
+}
+
+function logList() {
+  const needle = leaderView.find.trim().toLowerCase();
+  return newsList(LEADER.log.filter((e) => LOG_KINDS[leaderView.kind][1](e) && (!needle || `${e.name} ${e.old || ""}`.toLowerCase().includes(needle))), true);
+}
+
+function strikeTable(rows) {
+  return table(rows, [
+    { label: "#", key: (s) => s.id, html: (s) => `<span class="muted">${s.id}</span>` },
+    { label: "Date", key: (s) => s.ts, html: (s) => `<span class="muted">${when(s.ts)}</span>` },
+    { label: "Member", key: (s) => (s.name || "").toLowerCase(), html: (s) => who(s.tag, s.name || s.tag) },
+    { label: "Reason", key: null, html: (s) => esc(s.reason), wrap: true },
+    { label: "By", key: (s) => s.by, html: (s) => `<span class="muted">${s.by === "bot" ? "the bot" : esc(s.by)}</span>` },
+  ], 1);
+}
+
+function strikesPage() {
+  const recent = LEADER.strikes.filter((s) => s.ts > Date.now() / 1000 - LEADER.strike_window_days * 86400);
+  if (!LEADER.strikes.length) return `<h2>Strikes</h2><p class="empty">No strikes yet.</p>`;
+  return `<h2>Strikes</h2>` + ledger([
+    [num(recent.length), `strikes in ${LEADER.strike_window_days} days`, recent.length ? "loss" : ""],
+    [num(new Set(recent.map((s) => s.tag)).size), "members with one"],
+    [num(LEADER.strikes.length), "all time"],
+  ]) + strikeTable(LEADER.strikes) + `<p class="note">Missed attacks become strikes when a war ends. Give or take back strikes with <b>/strikes</b> in Discord.</p>`;
+}
+
+// A member's leaders-only notes, at the top of their page.
+function leaderBox(tag) {
+  if (!LEADER) { loadLeader(); return `<p class="note">Loading the leaders' notes…</p>`; }
+  if (LEADER.error) return `<p class="note">${esc(LEADER.error)}</p>`;
+  const r = LEADER.housekeeping.find((x) => x.tag === tag);
+  // The log here is what the public page doesn't show: leaves, demotions, warnings, and who did it.
+  const strikes = LEADER.strikes.filter((s) => s.tag === tag);
+  const log = LEADER.log.filter((e) => e.tag === tag && (e.by || !["join", "rejoin", "promote", "th", "rename", "milestone"].includes(e.kind)));
+  let html = `<section class="leader"><h3>Leaders only</h3>`;
+  if (r) {
+    html += ledger([
+      [played(r), "last played", r.quiet >= 7 ? "loss" : ""],
+      [r.war ? (r.war === "out" ? "Out" : "In") : "–", "war preference", r.war === "out" ? "loss" : ""],
+      [r.wars ? `${r.missed}/${r.wars}` : "–", "missed, last 10 wars", r.missed ? "loss" : ""],
+      [num(r.strikes), "strikes, 30 days", r.strikes ? "loss" : ""],
+      [r.donated == null ? "–" : num(r.donated), "donated, 30 days"],
+    ]);
+  }
+  if (strikes.length) html += `<h3>Strikes</h3>` + strikeTable(strikes);
+  if (log.length) html += `<h3>Member log</h3>` + newsList(log, true);
+  return html + `</section>`;
 }
 
 // The recorded clan chat: newest day first, each day in order, runs of messages under their speaker.
@@ -720,11 +945,12 @@ const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], 
 
 function route() {
   const [, page = "overview", a, b] = location.hash.split("/");
-  const current = page === "player" ? "members" : page;
+  const current = { player: "members", news: "overview" }[page] || page;
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
-    overview, members: membersPage, war: warPage, cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
+    overview, news: newsPage, members: membersPage, war: () => warPage(a), cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
     streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage, admin: adminPage,
+    leaders: () => leadersPage(a),
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);
@@ -747,7 +973,7 @@ async function main() {
   document.getElementById("clan-sub").innerHTML = [`Level ${num(c.level)} clan`, esc(c.war_league), c.win_streak > 1 && `${num(c.win_streak)}-war win streak`]
     .filter(Boolean).map((x) => `<span>${x}</span>`).join(" · ");
   await checkAdmin();
-  const tabs = ADMIN ? [...TABS, ["chat", "Chat log"]] : TABS;
+  const tabs = ADMIN ? [...TABS, ["leaders", "Leaders"], ["chat", "Chat log"]] : TABS;
   document.getElementById("tabs").innerHTML = `<div class="in">${tabs.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
   document.getElementById("foot").innerHTML = `<p>Updated ${ago(DATA.generated_at)}. Data from the Clash of Clans API, refreshed hourly by our clan bot.</p>
     <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>
