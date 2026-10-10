@@ -535,10 +535,10 @@ function setupViewer() {
 }
 
 // ---------------------------------------------------------------- admin (lovelycoc.com only)
-// The admin side runs on the clan's server behind lovelycoc.com/admin/ (admin.py): Google sign-in
-// for one account, and data that never goes into the public data.json, like the clan chat.
+// The admin side runs on the clan's server behind lovelycoc.com/admin/ (admin.py): sign-in with a
+// password and an authenticator code, and data that never goes into the public data.json (the chat).
 const ADMIN_HOST = "lovelycoc.com";
-let ADMIN = null;  // {email} once signed in
+let ADMIN = null;  // {user} once signed in
 let CHAT = null;   // {rows, checked}
 const chatView = { find: "", who: "" };
 
@@ -551,23 +551,68 @@ async function checkAdmin() {
 }
 
 function adminFooter() {
-  if (!ADMIN) return `<p class="admin"><a href="https://${ADMIN_HOST}/admin/login" rel="nofollow">admin</a></p>`;
-  return `<p class="admin">Signed in as ${esc(ADMIN.email)} · <a href="#/chat">chat log</a> ·
+  const here = location.hostname === ADMIN_HOST;
+  if (!ADMIN) return `<p class="admin"><a href="${here ? "" : `https://${ADMIN_HOST}/`}#/admin" rel="nofollow">admin</a></p>`;
+  return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/chat">chat log</a> ·
     <button type="button" id="signout">sign out</button></p>`;
 }
+
+const adminPost = (path, body) => fetch(path, {
+  method: "POST", credentials: "same-origin", cache: "no-store",
+  headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+});
 
 function setupAdmin() {
   const out = document.getElementById("signout");
   if (out) out.addEventListener("click", async () => {
-    try { await fetch("/admin/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { /* offline */ }
+    try { await adminPost("/admin/api/logout", {}); } catch (e) { /* offline */ }
     location.href = "/";
   });
+}
+
+// The sign-in form: username, password and the 6-digit code from the authenticator app.
+function adminPage() {
+  if (location.hostname !== ADMIN_HOST) return `<p class="empty">Sign in on <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>.</p>`;
+  if (ADMIN) { setTimeout(() => { location.hash = "#/chat"; }); return ""; }
+  setTimeout(() => {
+    const form = document.getElementById("signin");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("signin-msg"), button = form.querySelector("button");
+      button.disabled = true;
+      msg.textContent = "Checking…";
+      try {
+        const r = await adminPost("/admin/api/login", {
+          username: form.username.value, password: form.password.value, code: form.code.value,
+        });
+        if (r.ok) {
+          location.hash = "#/chat";
+          location.reload();
+          return;
+        }
+        msg.textContent = (await r.json().catch(() => ({}))).error || "Couldn't sign in.";
+      } catch (err) {
+        msg.textContent = "Couldn't reach the server.";
+      }
+      form.code.value = "";
+      button.disabled = false;
+    });
+  });
+  return `<h2>Admin</h2>
+    <form id="signin" class="signin" autocomplete="on">
+      <label>Username <input name="username" autocomplete="username" required maxlength="64" autocapitalize="none" spellcheck="false"></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+      <label>Code from your authenticator app <input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required maxlength="7"></label>
+      <button type="submit" class="join">Sign in</button>
+      <p class="note" id="signin-msg" role="status"></p>
+    </form>`;
 }
 
 async function loadChat() {
   try {
     const r = await fetch("/admin/api/chat", { credentials: "same-origin", cache: "no-store" });
-    CHAT = r.ok ? await r.json() : { rows: [], error: r.status === 401 ? "Your sign-in ran out. Sign in again." : "Couldn't load the chat." };
+    CHAT = r.ok ? await r.json() : { rows: [], error: r.status === 401 ? "Your sign-in ran out. Sign in again from the admin link." : "Couldn't load the chat." };
     if (r.status === 401) ADMIN = null;
   } catch (e) {
     CHAT = { rows: [], error: "Couldn't load the chat." };
@@ -577,7 +622,7 @@ async function loadChat() {
 
 // The recorded clan chat: newest day first, each day in order, runs of messages under their speaker.
 function chatPage() {
-  if (!ADMIN) return `<p class="empty">Sign in (the admin link at the bottom) to see the clan chat.</p>`;
+  if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see the clan chat.</p>`;
   if (!CHAT) { loadChat(); return `<p class="empty">Loading the clan chat…</p>`; }
   if (CHAT.error) return `<p class="empty">${esc(CHAT.error)}</p>`;
   setTimeout(() => {
@@ -663,7 +708,7 @@ function route() {
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, members: membersPage, war: warPage, cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage,
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage, admin: adminPage,
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);

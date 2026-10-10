@@ -338,6 +338,17 @@ footer .admin:hover, footer .admin:focus-within { opacity: 1; }
 footer .admin a, footer .admin button { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); }
 footer .admin button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
 
+/* The admin sign-in form. */
+.signin { display: grid; gap: 14px; max-width: 340px; margin-top: 18px; }
+.signin label { display: grid; gap: 5px; font-size: 13px; letter-spacing: .04em; color: var(--ink-2); }
+.signin input {
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-bottom-color: var(--ink);
+  border-radius: 0; padding: 9px 10px; font: 400 16px var(--text);
+}
+.signin input:focus { outline: 2px solid var(--blossom); outline-offset: 1px; }
+.signin .join { justify-self: start; cursor: pointer; background: none; color: var(--ink); }
+.signin .join:disabled { opacity: .5; cursor: wait; }
+
 /* The admin-only chat log. */
 input[type="search"] {
   min-width: 220px; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-bottom-color: var(--ink);
