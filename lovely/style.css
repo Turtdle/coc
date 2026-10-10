@@ -361,6 +361,8 @@ footer .admin button { padding: 0; border: 0; background: none; font: inherit; c
 .key { font: 500 18px/1.5 var(--display); letter-spacing: .06em; user-select: all; }
 #temp:not([hidden]), #setup-key { display: block; }
 #temp b.key { display: block; margin: 6px 0; }
+#temp .invite { margin: 10px 0 8px; padding: 10px 12px; background: var(--paper); border: 1px solid var(--rule);
+                white-space: pre-wrap; overflow-wrap: anywhere; font: 400 14px/1.55 var(--text); color: var(--ink); user-select: all; }
 
 /* The admin-only chat log. */
 input[type="search"] {

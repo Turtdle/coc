@@ -755,30 +755,46 @@ function usersPage() {
       } catch (e) { USERS = []; }
       list.innerHTML = `<div class="sheet"><table><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody>${USERS.map((u) => `
         <tr><td>${esc(u.username)}</td><td class="muted">${esc(u.role)}</td>
-        <td>${u.setup ? `<span class="loss">not set up yet</span>` : "ready"}</td>
+        <td>${!u.setup ? "ready" : u.invite_expires > Date.now() / 1000 ? `<span class="gold">invited · ${until(u.invite_expires)} left</span>`
+          : `<span class="loss">invite ran out · reset for a new password</span>`}</td>
         <td class="muted">${u.last_login ? ago(u.last_login) : "never"}</td>
         <td class="num">${u.role === "owner" ? "" : `<button type="button" class="mode" data-reset="${esc(u.username)}">reset</button> · <button type="button" class="mode" data-remove="${esc(u.username)}">remove</button>`}</td></tr>`).join("")}</tbody></table></div>`;
       list.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", async () => {
         if (!confirm(`Give ${b.dataset.reset} a new temporary password? Their authenticator entry stops working and they set up again.`)) return;
         const r = await adminPost("/admin/api/users/reset", { username: b.dataset.reset });
         const data = await r.json().catch(() => ({}));
-        shown.innerHTML = r.ok ? temp(data) : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`;
+        show(r.ok ? temp(data) : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`);
         draw();
       }));
       list.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", async () => {
         if (!confirm(`Remove ${b.dataset.remove}? They're signed out everywhere.`)) return;
         const r = await adminPost("/admin/api/users/remove", { username: b.dataset.remove });
         const data = await r.json().catch(() => ({}));
-        shown.innerHTML = r.ok ? "" : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`;
+        show(r.ok ? "" : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`);
         draw();
       }));
     };
-    const temp = (data) => `Give <b>${esc(data.username)}</b> this temporary password, by a private message: <b class="key">${esc(data.temporary_password)}</b>.
-      It's shown once. They sign in at <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>, then choose their own password and add the authenticator.`;
+    // The temporary password, shown once, as a message ready to send privately (with a Copy button).
+    const show = (html) => {
+      shown.innerHTML = html;
+      shown.hidden = !html;
+      const copy = shown.querySelector("#copy-invite");
+      if (copy) copy.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(document.getElementById("invite-text").textContent); copy.textContent = "Copied"; }
+        catch (e) { copy.textContent = "Select the text and copy it"; }
+      });
+      if (html) shown.scrollIntoView({ block: "nearest" });
+    };
+    const temp = (data) => `Send this to <b>${esc(data.username)}</b> in a private message. It's shown only now; if it gets lost, reset them for a new one.
+      <pre class="invite" id="invite-text">Admin sign-in for the Lovely clan site
+Username: ${esc(data.username)}
+Temporary password: ${esc(data.temporary_password)}
+Sign in at https://${ADMIN_HOST}/#/admin within 24 hours; after that this password stops working. Leave the code box empty, then choose your own password and add an authenticator app.</pre>
+      <button type="button" class="join" id="copy-invite">Copy</button>`;
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       formPost(form, "/admin/api/users/add", { username: form.username.value }, (data) => {
-        shown.innerHTML = temp(data);
+        show(temp(data));
         form.reset();
         form.querySelector("button[type=submit]").disabled = false;
         form.querySelector(".msg").textContent = "";
@@ -788,7 +804,8 @@ function usersPage() {
     draw();
   });
   return `<h2>Users</h2>
-    <p class="note">Everyone here sees the leaders' pages and the chat log. New users get a temporary password and must choose their own, plus an authenticator, before they see anything.</p>
+    <p class="note">Everyone here sees the leaders' pages and the chat log. Adding someone makes a temporary password that works for 24 hours;
+      they sign in with it, choose their own password and add an authenticator before they see anything. If it runs out, reset them for a new one.</p>
     <div id="users"><p class="empty">Loading…</p></div>
     <h3>Add a user</h3>
     <form id="adduser" class="signin" autocomplete="off">
@@ -856,7 +873,8 @@ function adminPage() {
     <form id="signin" class="signin" autocomplete="on">
       <label>Username <input name="username" autocomplete="username" required maxlength="64" autocapitalize="none" spellcheck="false"></label>
       <label>Password <input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
-      <label>Code from your authenticator app <input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required maxlength="7"></label>
+      <label>Code from your authenticator app <input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7"></label>
+      <p class="note">First time? Use the temporary password you were sent and leave the code empty.</p>
       <button type="submit" class="join">Sign in</button>
       <p class="note" id="signin-msg" role="status"></p>
     </form>`;
