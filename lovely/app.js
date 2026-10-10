@@ -1,7 +1,7 @@
 // Lovely clan mini site. Reads data.json (rebuilt hourly by the clan bot) and renders
 // everything client-side with hash routes: #/overview, #/news, #/members, #/war, #/war/<start>, #/cwl,
 // #/cwl/<round>, #/cwl/history, #/cwl/history/<season>, #/streaks, #/streaks/top, #/leaderboards,
-// #/player/<tag>; and, for the signed-in admin only, #/leaders[/log|/strikes] and #/chat.
+// #/player/<tag>; and, signed in, the Admin tab: #/admin[/log|/strikes|/chat|/users|/password|/setup].
 //
 // data.json's "war" is whatever war is on right now, a regular war or a CWL round (the
 // turtdle.github.io homepage reads it too). The War tab only shows regular wars ("war" when
@@ -666,11 +666,22 @@ async function checkAdmin() {
 
 // The admin's own pages: first sign-in (choose a password, add the authenticator), the owner's
 // user list, and changing a password. All talk to admin.py on this origin.
+// The Admin tab: signed out, the sign-in form; signed in, a sub-menu over everything admins see.
+const ADMIN_PAGES = [["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"], ["chat", "Chat log"],
+  ["users", "Users", "owner"], ["password", "Password"]];
+
+function adminNav(sub) {
+  const items = ADMIN.setup ? [] : ADMIN_PAGES.filter(([, , only]) => !only || ADMIN.role === only);
+  return `<div class="subnav admin-nav">${items.map(([k, v]) => `<a href="#/admin${k ? `/${k}` : ""}" class="${(sub || "") === k ? "on" : ""}">${v}</a>`).join("")}
+    <span class="who">${esc(ADMIN.user)} · <button type="button" id="signout">Sign out</button></span></div>`;
+}
+
 function adminSub(sub) {
-  if (sub === "setup") return setupPage();
-  if (sub === "users") return usersPage();
-  if (sub === "password") return passwordPage();
-  return adminPage();
+  if (!ADMIN) return adminPage();
+  if (ADMIN.setup || sub === "setup") return adminNav("setup") + setupPage();
+  const page = { log: () => leadersPage("log"), strikes: () => leadersPage("strikes"), chat: chatPage, users: usersPage,
+    password: passwordPage }[sub] || (() => leadersPage(""));
+  return adminNav(sub) + page();
 }
 
 function formPost(form, path, body, onOk) {
@@ -687,7 +698,7 @@ function formPost(form, path, body, onOk) {
 
 function setupPage() {
   if (!ADMIN) return `<p class="empty">Sign in first (<a class="link" href="#/admin">admin</a>).</p>`;
-  if (!ADMIN.setup) { setTimeout(() => { location.hash = "#/leaders"; }); return ""; }
+  if (!ADMIN.setup) { setTimeout(() => { location.hash = "#/admin"; }); return ""; }
   setTimeout(async () => {
     const box = document.getElementById("setup-key");
     if (!box) return;
@@ -703,7 +714,7 @@ function setupPage() {
       e.preventDefault();
       if (form.password.value !== form.password2.value) { form.querySelector(".msg").textContent = "The two passwords don't match."; return; }
       formPost(form, "/admin/api/setup", { password: form.password.value, code: form.code.value },
-        () => { location.hash = "#/leaders"; location.reload(); });
+        () => { location.hash = "#/admin"; location.reload(); });
     });
   });
   return `<h2>Welcome, ${esc(ADMIN.user)} <small>first sign-in</small></h2>
@@ -820,14 +831,11 @@ Sign in at https://${ADMIN_HOST}/#/admin within 24 hours; after that this passwo
 }
 
 
+// Signed out, a faint way in; signed in, everything is under the Admin tab.
 function adminFooter() {
+  if (ADMIN) return "";
   const here = location.hostname === ADMIN_HOST;
-  if (!ADMIN) return `<p class="admin"><a href="${here ? "" : `https://${ADMIN_HOST}/`}#/admin" rel="nofollow">admin</a></p>`;
-  if (ADMIN.setup) return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/admin/setup">finish setting up your account</a> ·
-    <button type="button" id="signout">sign out</button></p>`;
-  return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/leaders">leaders</a> · <a href="#/chat">chat log</a> ·
-    ${ADMIN.role === "owner" ? `<a href="#/admin/users">users</a> · ` : ""}<a href="#/admin/password">password</a> ·
-    <button type="button" id="signout">sign out</button></p>`;
+  return `<p class="admin"><a href="${here ? "" : `https://${ADMIN_HOST}/`}#/admin" rel="nofollow">admin</a></p>`;
 }
 
 const adminPost = (path, body) => fetch(path, {
@@ -836,9 +844,9 @@ const adminPost = (path, body) => fetch(path, {
 });
 
 function setupAdmin() {
-  const out = document.getElementById("signout");
-  if (out) out.addEventListener("click", async () => {
-    try { await adminPost("/admin/api/logout", {}); } catch (e) { /* offline */ }
+  document.getElementById("page").addEventListener("click", async (e) => {  // the Admin tab's sign-out
+    if (!e.target.closest("#signout")) return;
+    try { await adminPost("/admin/api/logout", {}); } catch (err) { /* offline */ }
     location.href = "/";
   });
 }
@@ -846,7 +854,7 @@ function setupAdmin() {
 // The sign-in form: username, password and the 6-digit code from the authenticator app.
 function adminPage() {
   if (location.hostname !== ADMIN_HOST) return `<p class="empty">Sign in on <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>.</p>`;
-  if (ADMIN) { setTimeout(() => { location.hash = ADMIN.setup ? "#/admin/setup" : "#/leaders"; }); return ""; }
+  if (ADMIN) { setTimeout(() => { location.hash = ADMIN.setup ? "#/admin/setup" : "#/admin"; }); return ""; }
   setTimeout(() => {
     const form = document.getElementById("signin");
     if (!form) return;
@@ -860,7 +868,7 @@ function adminPage() {
           username: form.username.value, password: form.password.value, code: form.code.value,
         });
         if (r.ok) {
-          location.hash = (await r.json().catch(() => ({}))).setup ? "#/admin/setup" : "#/leaders";
+          location.hash = (await r.json().catch(() => ({}))).setup ? "#/admin/setup" : "#/admin";
           location.reload();
           return;
         }
@@ -891,7 +899,7 @@ async function loadChat() {
   } catch (e) {
     CHAT = { rows: [], error: "Couldn't load the chat." };
   }
-  if (location.hash.startsWith("#/chat")) route();
+  if (location.hash.startsWith("#/admin/chat")) route();
 }
 
 async function loadLeader() {
@@ -905,7 +913,7 @@ async function loadLeader() {
     LEADER = { error: "Couldn't load the leaders' data." };
   }
   loadLeader.busy = false;
-  if (/^#\/(leaders|player)\b/.test(location.hash)) route();
+  if (/^#\/(admin|player)\b/.test(location.hash)) route();
 }
 
 const HK_FILTERS = {
@@ -926,9 +934,7 @@ function leadersPage(sub) {
   if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see this.</p>`;
   if (!LEADER) { loadLeader(); return `<p class="empty">Loading…</p>`; }
   if (LEADER.error) return `<p class="empty">${esc(LEADER.error)}</p>`;
-  const nav = `<div class="subnav">${[["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"]]
-    .map(([k, v]) => `<a href="#/leaders${k ? `/${k}` : ""}" class="${(sub || "") === k ? "on" : ""}">${v}</a>`).join("")}</div>`;
-  return nav + (sub === "log" ? memberLogPage() : sub === "strikes" ? strikesPage() : housekeepingPage());
+  return sub === "log" ? memberLogPage() : sub === "strikes" ? strikesPage() : housekeepingPage();
 }
 
 function housekeepingPage() {
@@ -940,7 +946,7 @@ function housekeepingPage() {
     pick.value = leaderView.how;
     pick.addEventListener("change", () => { leaderView.how = pick.value; document.getElementById("hk").innerHTML = hkTable(); });
   });
-  return `<h2>Housekeeping <small>${num(rows.length)} members · only you see this</small></h2>` + ledger([
+  return `<h2>Housekeeping <small>${num(rows.length)} members · admins only</small></h2>` + ledger([
     [num(count("quiet")), "quiet 7+ days", count("quiet") ? "loss" : ""],
     [num(count("out")), "war preference out"],
     [num(count("missed")), "missed attacks lately", count("missed") ? "loss" : ""],
@@ -1051,8 +1057,8 @@ async function loadReader() {
   }
   const box = document.getElementById("reader");
   if (box) box.innerHTML = readerPanel();
-  else if (!location.hash.startsWith("#/chat")) { clearInterval(readerWatch.timer); readerWatch.timer = null; return; }
-  if (CHAT === null && location.hash.startsWith("#/chat")) loadChat();
+  else if (!location.hash.startsWith("#/admin/chat")) { clearInterval(readerWatch.timer); readerWatch.timer = null; return; }
+  if (CHAT === null && location.hash.startsWith("#/admin/chat")) loadChat();
   const busy = READER.pending || (READER.state || "").startsWith("reading") || readerWatch.after !== null;
   if (busy && !readerWatch.timer) readerWatch.timer = setInterval(loadReader, 5000);
   if (!busy && readerWatch.timer) { clearInterval(readerWatch.timer); readerWatch.timer = null; }
@@ -1110,7 +1116,7 @@ function chatPage() {
   const counts = {};
   CHAT.rows.forEach((r) => { if (r.author && r.kind !== "system") counts[r.author] = (counts[r.author] || 0) + 1; });
   const people = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  return `<h2>Clan chat <small>${num(CHAT.rows.length)} messages${CHAT.checked ? ` · checked ${ago(CHAT.checked)}` : ""} · only you see this</small></h2>
+  return `<h2>Clan chat <small>${num(CHAT.rows.length)} messages${CHAT.checked ? ` · checked ${ago(CHAT.checked)}` : ""} · admins only</small></h2>
     <div id="reader" class="reader">${readerPanel()}</div>
     <div class="controls"><input id="chatfind" type="search" placeholder="Find in the chat" aria-label="Find in the chat" autocomplete="off">
       <select id="chatwho" aria-label="Member"><option value="">Everyone</option>${people.map((p) => `<option value="${esc(p)}">${esc(p)} (${counts[p]})</option>`).join("")}</select></div>
@@ -1176,6 +1182,8 @@ document.getElementById("mode").addEventListener("click", () => setTheme(documen
 
 const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], ["cwl", "CWL"], ["streaks", "Streaks"], ["leaderboards", "Leaderboards"]];
 
+const moved = (to) => { setTimeout(() => location.replace(to)); return ""; };
+
 function route() {
   const [, page = "overview", a, b] = location.hash.split("/");
   if (ADMIN?.setup && page !== "admin") { location.hash = "#/admin/setup"; return; }
@@ -1183,8 +1191,9 @@ function route() {
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, news: newsPage, members: membersPage, war: () => warPage(a), cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage, admin: () => adminSub(a),
-    leaders: () => leadersPage(a),
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), admin: () => adminSub(a),
+    // Old addresses of the admin pages, from before the Admin tab.
+    leaders: () => moved(`#/admin${a ? `/${a}` : ""}`), chat: () => moved("#/admin/chat"),
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);
@@ -1207,7 +1216,7 @@ async function main() {
   document.getElementById("clan-sub").innerHTML = [`Level ${num(c.level)} clan`, esc(c.war_league), c.win_streak > 1 && `${num(c.win_streak)}-war win streak`]
     .filter(Boolean).map((x) => `<span>${x}</span>`).join(" · ");
   await checkAdmin();
-  const tabs = ADMIN && !ADMIN.setup ? [...TABS, ["leaders", "Leaders"], ["chat", "Chat log"]] : TABS;
+  const tabs = ADMIN && !ADMIN.setup ? [...TABS, ["admin", "Admin"]] : TABS;
   document.getElementById("tabs").innerHTML = `<div class="in">${tabs.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
   document.getElementById("foot").innerHTML = `<p>Updated ${ago(DATA.generated_at)}. Data from the Clash of Clans API, refreshed hourly by our clan bot.</p>
     <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>
