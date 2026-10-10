@@ -534,6 +534,114 @@ function setupViewer() {
   d.addEventListener("close", () => { document.getElementById("viewer-img").removeAttribute("src"); });
 }
 
+// ---------------------------------------------------------------- admin (lovelycoc.com only)
+// The admin side runs on the clan's server behind lovelycoc.com/admin/ (admin.py): Google sign-in
+// for one account, and data that never goes into the public data.json, like the clan chat.
+const ADMIN_HOST = "lovelycoc.com";
+let ADMIN = null;  // {email} once signed in
+let CHAT = null;   // {rows, checked}
+const chatView = { find: "", who: "" };
+
+async function checkAdmin() {
+  if (location.hostname !== ADMIN_HOST) return;
+  try {
+    const r = await fetch("/admin/api/me", { credentials: "same-origin", cache: "no-store" });
+    if (r.ok) ADMIN = await r.json();
+  } catch (e) { /* not signed in, or the admin side is down: the public site works the same */ }
+}
+
+function adminFooter() {
+  if (!ADMIN) return `<p class="admin"><a href="https://${ADMIN_HOST}/admin/login" rel="nofollow">admin</a></p>`;
+  return `<p class="admin">Signed in as ${esc(ADMIN.email)} · <a href="#/chat">chat log</a> ·
+    <button type="button" id="signout">sign out</button></p>`;
+}
+
+function setupAdmin() {
+  const out = document.getElementById("signout");
+  if (out) out.addEventListener("click", async () => {
+    try { await fetch("/admin/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { /* offline */ }
+    location.href = "/";
+  });
+}
+
+async function loadChat() {
+  try {
+    const r = await fetch("/admin/api/chat", { credentials: "same-origin", cache: "no-store" });
+    CHAT = r.ok ? await r.json() : { rows: [], error: r.status === 401 ? "Your sign-in ran out. Sign in again." : "Couldn't load the chat." };
+    if (r.status === 401) ADMIN = null;
+  } catch (e) {
+    CHAT = { rows: [], error: "Couldn't load the chat." };
+  }
+  if (location.hash.startsWith("#/chat")) route();
+}
+
+// The recorded clan chat: newest day first, each day in order, runs of messages under their speaker.
+function chatPage() {
+  if (!ADMIN) return `<p class="empty">Sign in (the admin link at the bottom) to see the clan chat.</p>`;
+  if (!CHAT) { loadChat(); return `<p class="empty">Loading the clan chat…</p>`; }
+  if (CHAT.error) return `<p class="empty">${esc(CHAT.error)}</p>`;
+  setTimeout(() => {
+    const find = document.getElementById("chatfind"), who = document.getElementById("chatwho");
+    if (!find) return;
+    find.value = chatView.find;
+    who.value = chatView.who;
+    const redraw = () => { chatView.find = find.value; chatView.who = who.value; document.getElementById("chatlog").innerHTML = chatLog(); };
+    find.addEventListener("input", redraw);
+    who.addEventListener("change", redraw);
+  });
+  const counts = {};
+  CHAT.rows.forEach((r) => { if (r.author && r.kind !== "system") counts[r.author] = (counts[r.author] || 0) + 1; });
+  const people = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  return `<h2>Clan chat <small>${num(CHAT.rows.length)} messages${CHAT.checked ? ` · checked ${ago(CHAT.checked)}` : ""} · only you see this</small></h2>
+    <div class="controls"><input id="chatfind" type="search" placeholder="Find in the chat" aria-label="Find in the chat" autocomplete="off">
+      <select id="chatwho" aria-label="Member"><option value="">Everyone</option>${people.map((p) => `<option value="${esc(p)}">${esc(p)} (${counts[p]})</option>`).join("")}</select></div>
+    <div id="chatlog" class="chat">${chatLog()}</div>
+    <p class="note">Times are approximate (the game only says "3h ago"). Read from the game by the clan bot's reader.</p>`;
+}
+
+function chatLog() {
+  const needle = chatView.find.trim().toLowerCase();
+  const thByName = new Map(DATA.members.map((m) => [m.name, m.th]));
+  const rows = CHAT.rows.filter((r) => (!chatView.who || r.author === chatView.who) && (!needle || r.text.toLowerCase().includes(needle)));
+  if (!rows.length) return `<p class="empty">Nothing${needle ? ` with “${esc(chatView.find.trim())}”` : ""}.</p>`;
+  const days = [];
+  for (const r of rows) {
+    const day = new Date(r.ts * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    if (!days.length || days[days.length - 1].day !== day) days.push({ day, rows: [] });
+    days[days.length - 1].rows.push(r);
+  }
+  const time = (ts) => new Date(ts * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const mark = (text) => {  // highlight what was searched for, escaping each piece separately
+    if (!needle) return esc(text);
+    const lower = text.toLowerCase();
+    let out = "", i = 0, j;
+    while ((j = lower.indexOf(needle, i)) !== -1) {
+      out += esc(text.slice(i, j)) + `<mark>${esc(text.slice(j, j + needle.length))}</mark>`;
+      i = j + needle.length;
+    }
+    return out + esc(text.slice(i));
+  };
+  return days.reverse().map(({ day, rows: list }) => {
+    let html = `<h3>${esc(day)}</h3>`, speaker = null;
+    for (const r of list) {
+      if (r.kind === "system" || r.kind === "donation_request") {
+        speaker = null;
+        const text = r.kind === "system" ? r.text : `${r.author || "?"} asked for ${r.text}`;
+        html += `<p class="sys">${mark(text)} <span class="t">${time(r.ts)}</span></p>`;
+        continue;
+      }
+      if (r.author !== speaker) {
+        speaker = r.author;
+        html += `<p class="who">${th(thByName.get(r.author), "small")} <b>${esc(r.author || "?")}</b>${r.role ? ` <span class="muted">${esc(r.role)}</span>` : ""} <span class="t">${time(r.ts)}</span></p>`;
+      }
+      html += r.kind === "replay"
+        ? `<p class="msg replay">🎬 <i>Shared a replay: ${mark(r.text)}</i></p>`
+        : `<p class="msg">${mark(r.text)}</p>`;
+    }
+    return html;
+  }).join("");
+}
+
 // ---------------------------------------------------------------- shell
 // Light by default; the header switch picks night blossom, remembered in this browser only.
 function setTheme(dark, save = false) {
@@ -555,7 +663,7 @@ function route() {
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, members: membersPage, war: warPage, cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")),
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage,
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);
@@ -577,9 +685,13 @@ async function main() {
   document.getElementById("kicker").textContent = `Clash of Clans · ${c.tag}`;
   document.getElementById("clan-sub").innerHTML = [`Level ${num(c.level)} clan`, esc(c.war_league), c.win_streak > 1 && `${num(c.win_streak)}-war win streak`]
     .filter(Boolean).map((x) => `<span>${x}</span>`).join(" · ");
-  document.getElementById("tabs").innerHTML = `<div class="in">${TABS.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
+  await checkAdmin();
+  const tabs = ADMIN ? [...TABS, ["chat", "Chat log"]] : TABS;
+  document.getElementById("tabs").innerHTML = `<div class="in">${tabs.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
   document.getElementById("foot").innerHTML = `<p>Updated ${ago(DATA.generated_at)}. Data from the Clash of Clans API, refreshed hourly by our clan bot.</p>
-    <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>`;
+    <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>
+    ${adminFooter()}`;
+  setupAdmin();
   setupViewer();
   window.addEventListener("hashchange", () => { document.getElementById("viewer").close(); route(); });
   route();
