@@ -1032,12 +1032,73 @@ function leaderBox(tag) {
   return html + `</section>`;
 }
 
+// The game reader on the PC (admin.py /admin/api/reader): is it on, what's it doing, and a button to
+// run it now. While a run is asked for or going, it checks every few seconds; when a new run finishes,
+// the chat reloads.
+let READER = null;
+const readerWatch = { timer: null, after: null };
+
+async function loadReader() {
+  try {
+    const r = await fetch("/admin/api/reader", { credentials: "same-origin", cache: "no-store" });
+    READER = r.ok ? await r.json() : { error: r.status === 401 ? "Your sign-in ran out." : "Couldn't reach the reader's status." };
+  } catch (e) {
+    READER = { error: "Couldn't reach the reader's status." };
+  }
+  if (readerWatch.after !== null && READER.last && READER.last.id > readerWatch.after && READER.last.status !== "running") {
+    readerWatch.after = null;  // the run we asked for has finished: show the new chat
+    CHAT = null;
+  }
+  const box = document.getElementById("reader");
+  if (box) box.innerHTML = readerPanel();
+  else if (!location.hash.startsWith("#/chat")) { clearInterval(readerWatch.timer); readerWatch.timer = null; return; }
+  if (CHAT === null && location.hash.startsWith("#/chat")) loadChat();
+  const busy = READER.pending || (READER.state || "").startsWith("reading") || readerWatch.after !== null;
+  if (busy && !readerWatch.timer) readerWatch.timer = setInterval(loadReader, 5000);
+  if (!busy && readerWatch.timer) { clearInterval(readerWatch.timer); readerWatch.timer = null; }
+}
+
+function readerPanel() {
+  if (!READER) return `<p class="note">Checking the reader…</p>`;
+  if (READER.error) return `<p class="note">${esc(READER.error)}</p>`;
+  const r = READER, reading = (r.state || "").startsWith("reading");
+  const now = r.pending ? "asked for a run; the PC picks it up within a minute"
+    : !r.online ? `the PC is off${r.seen ? ` (last seen ${ago(r.seen)})` : ""}` : esc(r.state);
+  const last = r.last ? `Last run ${ago(r.last.finished || r.last.started)}: ${esc(r.last.summary)}.` : "No runs yet.";
+  const can = r.online && !r.pending && !reading;
+  return `<div class="reader-line"><span class="dot ${r.online ? "on" : ""}"></span>
+      <span><b>Game reader</b> · ${now}<br><span class="muted">${last}</span></span>
+      <button type="button" class="join" id="run-reader" ${can ? "" : "disabled"}>${reading || r.pending ? "Running…" : "Run the reader now"}</button></div>
+    <p class="note" id="reader-msg" role="status"></p>`;
+}
+
+async function runReader() {
+  const button = document.getElementById("run-reader"), msg = document.getElementById("reader-msg");
+  if (button) button.disabled = true;
+  try {
+    const before = READER?.last?.id ?? 0;
+    const r = await adminPost("/admin/api/reader/run", {});
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) { READER = data; readerWatch.after = before; }
+    if (msg) msg.textContent = data.message || data.error || "That didn't work.";
+  } catch (e) {
+    if (msg) msg.textContent = "Couldn't reach the server.";
+  }
+  const keep = document.getElementById("reader-msg")?.textContent;
+  await loadReader();
+  const m = document.getElementById("reader-msg");
+  if (m && keep) m.textContent = keep;
+}
+
 // The recorded clan chat: newest day first, each day in order, runs of messages under their speaker.
 function chatPage() {
   if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see the clan chat.</p>`;
   if (!CHAT) { loadChat(); return `<p class="empty">Loading the clan chat…</p>`; }
   if (CHAT.error) return `<p class="empty">${esc(CHAT.error)}</p>`;
   setTimeout(() => {
+    loadReader();
+    const reader = document.getElementById("reader");
+    if (reader) reader.addEventListener("click", (e) => { if (e.target.closest("#run-reader")) runReader(); });
     const find = document.getElementById("chatfind"), who = document.getElementById("chatwho");
     if (!find) return;
     find.value = chatView.find;
@@ -1050,6 +1111,7 @@ function chatPage() {
   CHAT.rows.forEach((r) => { if (r.author && r.kind !== "system") counts[r.author] = (counts[r.author] || 0) + 1; });
   const people = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   return `<h2>Clan chat <small>${num(CHAT.rows.length)} messages${CHAT.checked ? ` · checked ${ago(CHAT.checked)}` : ""} · only you see this</small></h2>
+    <div id="reader" class="reader">${readerPanel()}</div>
     <div class="controls"><input id="chatfind" type="search" placeholder="Find in the chat" aria-label="Find in the chat" autocomplete="off">
       <select id="chatwho" aria-label="Member"><option value="">Everyone</option>${people.map((p) => `<option value="${esc(p)}">${esc(p)} (${counts[p]})</option>`).join("")}</select></div>
     <div id="chatlog" class="chat">${chatLog()}</div>
