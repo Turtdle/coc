@@ -310,11 +310,19 @@ function seasonPage() {
       <th>#</th><th>Clan</th><th class="num">Stars</th><th class="num">Destruction</th></tr></thead><tbody>${c.standings.map((s, i) => `
       <tr class="${s.us ? "us" : ""}"><td><span class="rank ${i ? "" : "r1"}">${i + 1}</span></td><td dir="auto">${esc(s.name)}</td>
       <td class="num"><b>${num(s.stars)}</b> ${star}</td><td class="num muted">${num(s.destruction)}%</td></tr>`).join("")}</tbody></table></div></section>` : "";
-  const rounds = `<section><h2>Rounds</h2><div class="fixtures">${c.rounds.map((r) => {
+  // Rounds: built like the Group table, with a total row, so the two sit level (8 clans, 7 rounds).
+  const played = c.rounds.filter((r) => r.state !== "preparation");
+  const sum = (i) => played.reduce((t, r) => t + r.stars[i], 0);
+  const avg = (i) => Math.round(played.reduce((t, r) => t + r.pct[i], 0) / played.length);
+  const rounds = `<section><h2>Rounds</h2><div class="sheet"><table class="rounds"><thead><tr>
+      <th>#</th><th>Result</th><th>Opponent</th><th class="num">Stars</th><th class="num wide">Destruction</th></tr></thead><tbody>${c.rounds.map((r) => {
     const prep = r.state === "preparation";
-    return `<a href="#/cwl/${r.round}"><span class="rd">R${r.round}</span>${res(result(r))}<span class="opp" dir="auto">${esc(r.opponent)}</span>
-      <span class="sc">${prep ? "" : `${r.stars[0]}–${r.stars[1]}`}</span><span class="pc">${prep ? "" : `${Math.round(r.pct[0])}% – ${Math.round(r.pct[1])}%`}</span></a>`;
-  }).join("")}</div></section>`;
+    return `<tr data-href="#/cwl/${r.round}"><td><span class="rank">R${r.round}</span></td><td>${res(result(r))}</td>
+      <td dir="auto"><a href="#/cwl/${r.round}">${esc(r.opponent)}</a></td>
+      <td class="num">${prep ? "" : `<b>${r.stars[0]}</b> – ${r.stars[1]}`}</td>
+      <td class="num muted wide">${prep ? "" : `${Math.round(r.pct[0])}% – ${Math.round(r.pct[1])}%`}</td></tr>`;
+  }).join("")}${played.length ? `<tr class="total"><td colspan="3">All rounds</td><td class="num"><b>${sum(0)}</b> – ${sum(1)}</td>
+      <td class="num muted wide">avg ${avg(0)}% – ${avg(1)}%</td></tr>` : ""}</tbody></table></div></section>`;
   html += `<div class="cols">${group}${rounds}</div>`;
 
   // Members x rounds: the stars each member got in each round.
@@ -653,152 +661,10 @@ async function checkAdmin() {
   } catch (e) { /* not signed in, or the admin side is down: the public site works the same */ }
 }
 
-// The admin's own pages: first sign-in (choose a password, add the authenticator), the owner's
-// user list, and changing a password. All talk to admin.py on this origin.
-function adminSub(sub) {
-  if (sub === "setup") return setupPage();
-  if (sub === "users") return usersPage();
-  if (sub === "password") return passwordPage();
-  return adminPage();
-}
-
-function formPost(form, path, body, onOk) {
-  const msg = form.querySelector(".msg"), button = form.querySelector("button[type=submit]");
-  button.disabled = true;
-  msg.textContent = "Checking…";
-  adminPost(path, body).then(async (r) => {
-    const data = await r.json().catch(() => ({}));
-    if (r.ok) return onOk(data);
-    msg.textContent = data.error || "That didn't work.";
-    button.disabled = false;
-  }).catch(() => { msg.textContent = "Couldn't reach the server."; button.disabled = false; });
-}
-
-function setupPage() {
-  if (!ADMIN) return `<p class="empty">Sign in first (<a class="link" href="#/admin">admin</a>).</p>`;
-  if (!ADMIN.setup) { setTimeout(() => { location.hash = "#/leaders"; }); return ""; }
-  setTimeout(async () => {
-    const box = document.getElementById("setup-key");
-    if (!box) return;
-    try {
-      const r = await fetch("/admin/api/setup", { credentials: "same-origin", cache: "no-store" });
-      const data = await r.json();
-      if (!r.ok) { box.textContent = data.error || "Couldn't get the key."; return; }
-      box.innerHTML = `<b class="key">${esc(data.key)}</b>
-        <span class="note">On a phone, <a class="link" href="${esc(data.uri)}">open it in the authenticator app</a> instead of typing.</span>`;
-    } catch (e) { box.textContent = "Couldn't reach the server."; }
-    const form = document.getElementById("setup");
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (form.password.value !== form.password2.value) { form.querySelector(".msg").textContent = "The two passwords don't match."; return; }
-      formPost(form, "/admin/api/setup", { password: form.password.value, code: form.code.value },
-        () => { location.hash = "#/leaders"; location.reload(); });
-    });
-  });
-  return `<h2>Welcome, ${esc(ADMIN.user)} <small>first sign-in</small></h2>
-    <p class="note">Two things before you can see anything: choose a password, and add this site to an authenticator app
-      (Google Authenticator, Microsoft Authenticator, Authy, 1Password…). In the app: add an account, enter a setup key,
-      time based. Then type the 6-digit code it shows.</p>
-    <p class="aside" id="setup-key">Getting your key…</p>
-    <form id="setup" class="signin" autocomplete="on">
-      <label>New password (16 characters or more; a few words is easiest) <input name="password" type="password" autocomplete="new-password" required minlength="16" maxlength="200"></label>
-      <label>The same password again <input name="password2" type="password" autocomplete="new-password" required minlength="16" maxlength="200"></label>
-      <label>The 6-digit code from the app <input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required maxlength="7"></label>
-      <button type="submit" class="join">Finish</button>
-      <p class="note msg" role="status"></p>
-    </form>`;
-}
-
-function passwordPage() {
-  if (!ADMIN || ADMIN.setup) return `<p class="empty">Sign in first (<a class="link" href="#/admin">admin</a>).</p>`;
-  setTimeout(() => {
-    const form = document.getElementById("password-form");
-    if (!form) return;
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (form.new_password.value !== form.new_password2.value) { form.querySelector(".msg").textContent = "The two new passwords don't match."; return; }
-      formPost(form, "/admin/api/password", { password: form.password.value, new_password: form.new_password.value, code: form.code.value },
-        () => { form.querySelector(".msg").textContent = "Changed. Your other devices are signed out."; form.reset(); form.querySelector("button[type=submit]").disabled = false; });
-    });
-  });
-  return `<h2>Change your password</h2>
-    <form id="password-form" class="signin" autocomplete="on">
-      <label>Current password <input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
-      <label>New password (16 characters or more) <input name="new_password" type="password" autocomplete="new-password" required minlength="16" maxlength="200"></label>
-      <label>The new password again <input name="new_password2" type="password" autocomplete="new-password" required minlength="16" maxlength="200"></label>
-      <label>The 6-digit code from your authenticator app <input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required maxlength="7"></label>
-      <button type="submit" class="join">Change</button>
-      <p class="note msg" role="status"></p>
-    </form>`;
-}
-
-let USERS = null;
-
-function usersPage() {
-  if (!ADMIN || ADMIN.setup) return `<p class="empty">Sign in first (<a class="link" href="#/admin">admin</a>).</p>`;
-  if (ADMIN.role !== "owner") return `<p class="empty">Only the owner manages users.</p>`;
-  setTimeout(async () => {
-    const list = document.getElementById("users"), form = document.getElementById("adduser"), shown = document.getElementById("temp");
-    if (!list) return;
-    const draw = async () => {
-      try {
-        const r = await fetch("/admin/api/users", { credentials: "same-origin", cache: "no-store" });
-        USERS = r.ok ? (await r.json()).users : [];
-      } catch (e) { USERS = []; }
-      list.innerHTML = `<div class="sheet"><table><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody>${USERS.map((u) => `
-        <tr><td>${esc(u.username)}</td><td class="muted">${esc(u.role)}</td>
-        <td>${u.setup ? `<span class="loss">not set up yet</span>` : "ready"}</td>
-        <td class="muted">${u.last_login ? ago(u.last_login) : "never"}</td>
-        <td class="num">${u.role === "owner" ? "" : `<button type="button" class="mode" data-reset="${esc(u.username)}">reset</button> · <button type="button" class="mode" data-remove="${esc(u.username)}">remove</button>`}</td></tr>`).join("")}</tbody></table></div>`;
-      list.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", async () => {
-        if (!confirm(`Give ${b.dataset.reset} a new temporary password? Their authenticator entry stops working and they set up again.`)) return;
-        const r = await adminPost("/admin/api/users/reset", { username: b.dataset.reset });
-        const data = await r.json().catch(() => ({}));
-        shown.innerHTML = r.ok ? temp(data) : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`;
-        draw();
-      }));
-      list.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", async () => {
-        if (!confirm(`Remove ${b.dataset.remove}? They're signed out everywhere.`)) return;
-        const r = await adminPost("/admin/api/users/remove", { username: b.dataset.remove });
-        const data = await r.json().catch(() => ({}));
-        shown.innerHTML = r.ok ? "" : `<span class="loss">${esc(data.error || "That didn't work.")}</span>`;
-        draw();
-      }));
-    };
-    const temp = (data) => `Give <b>${esc(data.username)}</b> this temporary password, by a private message: <b class="key">${esc(data.temporary_password)}</b>.
-      It's shown once. They sign in at <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>, then choose their own password and add the authenticator.`;
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      formPost(form, "/admin/api/users/add", { username: form.username.value }, (data) => {
-        shown.innerHTML = temp(data);
-        form.reset();
-        form.querySelector("button[type=submit]").disabled = false;
-        form.querySelector(".msg").textContent = "";
-        draw();
-      });
-    });
-    draw();
-  });
-  return `<h2>Users</h2>
-    <p class="note">Everyone here sees the leaders' pages and the chat log. New users get a temporary password and must choose their own, plus an authenticator, before they see anything.</p>
-    <div id="users"><p class="empty">Loading…</p></div>
-    <h3>Add a user</h3>
-    <form id="adduser" class="signin" autocomplete="off">
-      <label>Username (letters, digits, dots, dashes) <input name="username" required pattern="[a-z0-9][a-z0-9._-]{1,31}" maxlength="32" autocapitalize="none" spellcheck="false"></label>
-      <button type="submit" class="join">Add</button>
-      <p class="note msg" role="status"></p>
-    </form>
-    <p class="aside" id="temp" hidden></p>`;
-}
-
-
 function adminFooter() {
   const here = location.hostname === ADMIN_HOST;
   if (!ADMIN) return `<p class="admin"><a href="${here ? "" : `https://${ADMIN_HOST}/`}#/admin" rel="nofollow">admin</a></p>`;
-  if (ADMIN.setup) return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/admin/setup">finish setting up your account</a> ·
-    <button type="button" id="signout">sign out</button></p>`;
   return `<p class="admin">Signed in as ${esc(ADMIN.user)} · <a href="#/leaders">leaders</a> · <a href="#/chat">chat log</a> ·
-    ${ADMIN.role === "owner" ? `<a href="#/admin/users">users</a> · ` : ""}<a href="#/admin/password">password</a> ·
     <button type="button" id="signout">sign out</button></p>`;
 }
 
@@ -818,7 +684,7 @@ function setupAdmin() {
 // The sign-in form: username, password and the 6-digit code from the authenticator app.
 function adminPage() {
   if (location.hostname !== ADMIN_HOST) return `<p class="empty">Sign in on <a class="link" href="https://${ADMIN_HOST}/#/admin">${ADMIN_HOST}</a>.</p>`;
-  if (ADMIN) { setTimeout(() => { location.hash = ADMIN.setup ? "#/admin/setup" : "#/leaders"; }); return ""; }
+  if (ADMIN) { setTimeout(() => { location.hash = "#/leaders"; }); return ""; }
   setTimeout(() => {
     const form = document.getElementById("signin");
     if (!form) return;
@@ -832,7 +698,7 @@ function adminPage() {
           username: form.username.value, password: form.password.value, code: form.code.value,
         });
         if (r.ok) {
-          location.hash = (await r.json().catch(() => ({}))).setup ? "#/admin/setup" : "#/leaders";
+          location.hash = "#/leaders";
           location.reload();
           return;
         }
@@ -1087,12 +953,11 @@ const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], 
 
 function route() {
   const [, page = "overview", a, b] = location.hash.split("/");
-  if (ADMIN?.setup && page !== "admin") { location.hash = "#/admin/setup"; return; }
   const current = { player: "members", news: "overview" }[page] || page;
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, news: newsPage, members: membersPage, war: () => warPage(a), cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage, admin: () => adminSub(a),
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), chat: chatPage, admin: adminPage,
     leaders: () => leadersPage(a),
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
@@ -1116,13 +981,18 @@ async function main() {
   document.getElementById("clan-sub").innerHTML = [`Level ${num(c.level)} clan`, esc(c.war_league), c.win_streak > 1 && `${num(c.win_streak)}-war win streak`]
     .filter(Boolean).map((x) => `<span>${x}</span>`).join(" · ");
   await checkAdmin();
-  const tabs = ADMIN && !ADMIN.setup ? [...TABS, ["leaders", "Leaders"], ["chat", "Chat log"]] : TABS;
+  const tabs = ADMIN ? [...TABS, ["leaders", "Leaders"], ["chat", "Chat log"]] : TABS;
   document.getElementById("tabs").innerHTML = `<div class="in">${tabs.map(([k, v]) => `<a href="#/${k}" data-tab="${k}">${v}</a>`).join("")}</div>`;
   document.getElementById("foot").innerHTML = `<p>Updated ${ago(DATA.generated_at)}. Data from the Clash of Clans API, refreshed hourly by our clan bot.</p>
     <p>This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it.</p>
     ${adminFooter()}`;
   setupAdmin();
   setupViewer();
+  // Table rows that open a page (CWL rounds): a click anywhere on the row, not just its link.
+  document.getElementById("page").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-href]");
+    if (row && !e.target.closest("a") && !String(getSelection())) location.hash = row.dataset.href;
+  });
   window.addEventListener("hashchange", () => { document.getElementById("viewer").close(); route(); });
   route();
 }

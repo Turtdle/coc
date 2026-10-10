@@ -271,15 +271,11 @@ table.grid td.mid, table.grid th.mid { padding-left: 4px; padding-right: 4px; mi
 .roundnav { display: flex; justify-content: space-between; gap: 16px; margin-top: 26px; font-size: 14px; color: var(--ink-2); }
 .roundnav span { display: flex; gap: 18px; }
 
-/* CWL rounds, as a fixture list. */
-.fixtures a { display: grid; grid-template-columns: 34px 60px 1fr auto auto; align-items: baseline; gap: 14px;
-              padding: 10px 2px; border-bottom: 1px solid var(--rule); }
-.fixtures a:first-child { border-top: 1px solid var(--ink); }
-.fixtures a:hover { background: var(--paper-2); }
-.fixtures .rd { font: italic 400 17px var(--display); color: var(--muted); }
-.fixtures .opp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.fixtures .sc { font: 500 18px var(--display); }
-.fixtures .pc { color: var(--muted); font-size: 13.5px; min-width: 92px; text-align: right; }
+/* CWL rounds: the same table as the group beside it; each row opens its round. */
+.rounds tr[data-href] { cursor: pointer; }
+.rounds td:nth-child(3) { white-space: normal; font-weight: 500; }
+.rounds tr.total td { color: var(--ink-2); }
+.rounds tr.total:hover td { background: none; }
 
 .subnav { display: flex; gap: 22px; margin: 26px 0 0; font-size: 14.5px; }
 .subnav a { color: var(--ink-2); padding-bottom: 3px; border-bottom: 1px solid transparent; }
@@ -362,9 +358,6 @@ footer .admin button { padding: 0; border: 0; background: none; font: inherit; c
 .signin input:focus { outline: 2px solid var(--blossom); outline-offset: 1px; }
 .signin .join { justify-self: start; cursor: pointer; background: none; color: var(--ink); }
 .signin .join:disabled { opacity: .5; cursor: wait; }
-.key { font: 500 18px/1.5 var(--display); letter-spacing: .06em; user-select: all; }
-#temp:not([hidden]), #setup-key { display: block; }
-#temp b.key { display: block; margin: 6px 0; }
 
 /* The admin-only chat log. */
 input[type="search"] {
@@ -401,7 +394,6 @@ input[type="search"] {
   .sb .pts { font-size: 42px; }
   .sb .pts img.star { width: 20px; height: 20px; vertical-align: 3px; margin: 0 3px; }
   .scoreboard .detail { flex-direction: column; gap: 2px; }
-  .fixtures a { grid-template-columns: 26px 48px 1fr auto; }
   .war-button { grid-template-areas: "what what" "vs vs" "score score" "note go"; padding: 18px 18px 16px; }
   .wb-vs { font-size: 24px; }
   .wb-score { text-align: left; font-size: 44px; margin: 4px 0 2px; }
@@ -409,7 +401,7 @@ input[type="search"] {
   .streaks .len b { font-size: 36px; }
   .streaks .proof { grid-column: 2; flex-wrap: wrap; margin-top: 8px; }
   .streaks .proof img { width: 88px; height: 54px; }
-  .fixtures .pc { display: none; }
+  .rounds .wide { display: none; }
   td, th { padding-left: 7px; padding-right: 7px; }
   .lede { font-size: 20px; }
   .player-head h2 { font-size: 30px; }
