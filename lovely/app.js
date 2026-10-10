@@ -325,12 +325,16 @@ function historyPage() {
     The bot has recorded every member since October 2026. Each member's perfect CWLs are on the <a class="link" href="#/members">Members</a> list and their own page.</p>`;
   html += table(h.seasons, [
     { label: "Season", key: (s) => s.season, html: (s) => `<a class="link" href="#/cwl/history/${encodeURIComponent(s.season)}">${esc(s.label)}</a>` },
-    { label: "Perfect", key: (s) => s.rows.filter((r) => r.perfect).length, html: (s) => (s.done ? num(s.rows.filter((r) => r.perfect).length) : `<span class="muted">–</span>`), num: true },
+    {
+      label: "Finish", key: (s) => (s.finish?.place ? -s.finish.place : -99),
+      html: (s) => (s.finish?.place ? `${ordinal(s.finish.place)}${s.finish.movement === "up" ? ` <span class="win" title="promoted">▲</span>` : s.finish.movement === "down" ? ` <span class="loss" title="demoted">▼</span>` : ""} <span class="muted">${esc(s.finish.league)}</span>` : `<span class="muted">–</span>`),
+    },
+    { label: "Perfect", key: (s) => s.rows.filter((r) => r.perfect).length, html: (s) => (s.done && s.source !== "log" ? num(s.rows.filter((r) => r.perfect).length) : `<span class="muted">–</span>`), num: true },
     {
       label: "Top of the board", key: null, wrap: true,
       html: (s) => {
         const perfect = s.rows.filter((r) => r.perfect), top = perfect.length ? perfect : s.rows.filter((r) => r.position === 1);
-        if (!top.length) return "";
+        if (!top.length) return s.finish ? `<span class="muted">clan totals only · ${num(s.finish.stars)}${star}</span>` : "";
         const shown = top.slice(0, 4).map((r) => who(r.tag, r.now || r.name)).join(", ");
         const more = top.length > 4 ? ` <span class="muted">+${top.length - 4} more</span>` : "";
         return perfect.length ? shown + more : `${shown}${more} <span class="muted">· ${top[0].stars}${star}</span>`;
@@ -348,9 +352,20 @@ function historySeason(key) {
   const perfect = s.rows.filter((r) => r.perfect).length;
   const source = s.source === "screenshot"
     ? "From the leaderboard screenshot posted after the season, so only the top of the board."
+    : s.source === "log" ? "Only the clan's totals for this season, from the war log."
     : s.done ? "Recorded by the clan bot." : "Still going: finished rounds only.";
-  html += `<h2>${esc(s.label)} ${s.result ? `<small>${esc(s.result)}</small>` : ""}</h2>
-    <p class="note">${source}${perfect ? ` ${perfect} perfect.` : ""}${s.note ? ` ${esc(s.note)}` : ""}</p>`;
+  const f = s.finish;
+  html += `<h2>${esc(s.label)} ${s.result ? `<small>${esc(s.result)}</small>` : ""}</h2>`;
+  if (f) {
+    html += ledger([
+      [f.place ? ordinal(f.place) : "–", f.place ? `${f.movement === "up" ? "promoted from" : f.movement === "down" ? "demoted from" : "in"} ${f.league}` : "place not known", "gold"],
+      [`${num(f.stars)}${star}`, "clan stars"],
+      [`${num(f.destruction)}%`, "total destruction"],
+      [`${num(f.attacks)}/${num(f.team_size * 7)}`, `attacks (${f.team_size} v ${f.team_size})`],
+    ]);
+  }
+  html += `<p class="note">${source}${perfect ? ` ${perfect} perfect.` : ""}${s.note ? ` ${esc(s.note)}` : ""}</p>`;
+  if (!s.rows.length) return html;
   return html + table(s.rows, [
     { label: "#", key: (r) => r.position, html: (r) => `<span class="rank ${r.position === 1 ? "r1" : ""}">${r.position}</span>` },
     {
