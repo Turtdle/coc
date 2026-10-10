@@ -422,14 +422,21 @@ const METRICS = {
   stars: ["Total stars", (s) => s.attacks && s.triples * 3 + s.by_stars[2] * 2 + s.by_stars[1], (v) => `${v} ${star}`, (s) => `${s.attacks} attacks`],
   missed: ["Missed attacks", (s) => s.missed || false, (v) => v, (s) => `${s.wars} wars`],
   hold_rate: ["Defense hold rate", (s, d) => d.attacked >= 3 && d.held / d.attacked, (v) => pct(v), (s, d) => `held ${d.held} of ${d.attacked}`],
+  soe: ["Stars vs expected", (s) => s.attacks >= 3 && s.soe, (v) => (v > 0 ? "+" : "") + v.toFixed(2), (s) => `${s.attacks} attacks · ${s.up} up`],
   donations_total: ["Donations", null, (v) => num(v), null],
+  progress: ["Fastest progress", null, (v) => `${v}/week`, null],
+  games: ["Clan Games points", null, (v) => num(v), null],
 };
+// Leaderboards that aren't about wars (the war filter doesn't apply).
+const NOT_WARS = new Set(["donations_total", "progress", "games"]);
 
 function leaderboardsPage(metric = "triple_rate", scope = "all") {
   if (!METRICS[metric]) metric = "triple_rate";
   const [label, value, fmt, detail] = METRICS[metric];
   let rows;
   if (metric === "donations_total") rows = DATA.members.filter((m) => m.donations_total != null).map((m) => [m, m.donations_total, `got ${num(m.received_total)}`]);
+  else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} days`]);
+  else if (metric === "games") rows = DATA.members.filter((m) => m.games).map((m) => [m, m.games.points, m.games.ongoing ? "still going" : `${m.games.start.slice(5)} to ${m.games.end.slice(5)}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
   const opts = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("");
@@ -438,7 +445,7 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
     document.getElementById("metric").onchange = go;
     document.getElementById("scope").onchange = go;
   });
-  return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${metric.startsWith("donations") ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
+  return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${NOT_WARS.has(metric) ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
     <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, fmt(v), d]))}
     <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.</p>`;
 }
@@ -451,6 +458,14 @@ function playerPage(tag) {
     m.donations_total != null && [num(m.donations_total), `donated since ${when(m.tracked_since)}`, "gold"],
     m.donations_total != null && [num(m.received_total), "received"],
   ]);
+  if (m.progress || m.games) {
+    html += `<h3>Progress</h3>` + ledger([
+      m.progress && [`+${num(m.progress.gained)}`, `upgrade levels in ${m.progress.days} days`, "gold"],
+      m.progress && [`${m.progress.per_week}`, "levels a week"],
+      m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
+      m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],
+    ]);
+  }
   for (const [scope, name] of [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]]) {
     const s = m.war[scope], d = m.defense[scope];
     if (!s.attacks && !d.attacked) continue;
@@ -460,6 +475,7 @@ function playerPage(tag) {
       [s.avg_stars.toFixed(2), "avg stars"],
       [`${Math.round(s.avg_destruction)}%`, "avg destruction"],
       [num(s.missed), "missed", s.missed ? "loss" : ""],
+      s.attacks >= 3 && [(s.soe > 0 ? "+" : "") + s.soe.toFixed(2), "stars vs expected", s.soe > 0 ? "win" : s.soe < 0 ? "loss" : ""],
       d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
       d.attacked && [num(d.attacked), "times attacked"],
     ]);
