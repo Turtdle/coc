@@ -358,6 +358,9 @@ footer .admin button { padding: 0; border: 0; background: none; font: inherit; c
 .signin input:focus { outline: 2px solid var(--blossom); outline-offset: 1px; }
 .signin .join { justify-self: start; cursor: pointer; background: none; color: var(--ink); }
 .signin .join:disabled { opacity: .5; cursor: wait; }
+.key { font: 500 18px/1.5 var(--display); letter-spacing: .06em; user-select: all; }
+#temp:not([hidden]), #setup-key { display: block; }
+#temp b.key { display: block; margin: 6px 0; }
 
 /* The admin-only chat log. */
 input[type="search"] {
