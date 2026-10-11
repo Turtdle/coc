@@ -668,7 +668,7 @@ async function checkAdmin() {
 // user list, and changing a password. All talk to admin.py on this origin.
 // The Admin tab: signed out, the sign-in form; signed in, a sub-menu over everything admins see.
 const ADMIN_PAGES = [["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"], ["chat", "Chat log"],
-  ["users", "Users", "owner"], ["password", "Password"]];
+  ["visits", "Visitors"], ["users", "Users", "owner"], ["password", "Password"]];
 
 function adminNav(sub) {
   const items = ADMIN.setup ? [] : ADMIN_PAGES.filter(([, , only]) => !only || ADMIN.role === only);
@@ -679,8 +679,8 @@ function adminNav(sub) {
 function adminSub(sub) {
   if (!ADMIN) return adminPage();
   if (ADMIN.setup || sub === "setup") return adminNav("setup") + setupPage();
-  const page = { log: () => leadersPage("log"), strikes: () => leadersPage("strikes"), chat: chatPage, users: usersPage,
-    password: passwordPage }[sub] || (() => leadersPage(""));
+  const page = { log: () => leadersPage("log"), strikes: () => leadersPage("strikes"), chat: chatPage, visits: visitsPage,
+    users: usersPage, password: passwordPage }[sub] || (() => leadersPage(""));
   return adminNav(sub) + page();
 }
 
@@ -1096,6 +1096,48 @@ async function runReader() {
   if (m && keep) m.textContent = keep;
 }
 
+// Visitors (admin.py /admin/api/visits): the last 30 days of anonymous visit counts.
+let VISITS = null;
+const PAGE_NAMES = { overview: "Overview", news: "Clan news", members: "Members", player: "Player pages", war: "War",
+  cwl: "CWL", streaks: "Streaks", leaderboards: "Leaderboards" };
+
+async function loadVisits() {
+  try {
+    const r = await fetch("/admin/api/visits", { credentials: "same-origin", cache: "no-store" });
+    VISITS = r.ok ? { ...(await r.json()), at: Date.now() } : { error: r.status === 401 ? "Your sign-in ran out." : "Couldn't load the visits.", at: Date.now() };
+  } catch (e) {
+    VISITS = { error: "Couldn't load the visits.", at: Date.now() };
+  }
+  if (location.hash.startsWith("#/admin/visits")) route();
+}
+
+function visitsPage() {
+  if (!VISITS || Date.now() - VISITS.at > 60000) { loadVisits(); if (!VISITS) return `<p class="empty">Loading…</p>`; }
+  if (VISITS.error) return `<p class="empty">${esc(VISITS.error)}</p>`;
+  const v = VISITS, top = Math.max(1, ...v.daily.map((d) => d.visitors));
+  const day = (iso, opts = { month: "short", day: "numeric" }) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, opts);
+  const bars = v.daily.map((d, i) => `<span class="${i === v.daily.length - 1 ? "today" : ""}" style="height:${Math.round((d.visitors / top) * 100)}%"
+    title="${day(d.day, { weekday: "short", month: "short", day: "numeric" })}: ${d.visitors} visitor${d.visitors === 1 ? "" : "s"}, ${d.visits} visits, ${d.views} tab views"></span>`).join("");
+  const list = (rows, label, value) => (rows.length ? `<ol class="ranks">${rows.map((r, i) => `<li><span class="rank ${i ? "" : "r1"}">${i + 1}</span>
+      <span class="who">${label(r)}</span><b class="value ${i ? "" : "gold"}">${num(value(r))}</b></li>`).join("")}</ol>` : `<p class="empty">Nothing yet.</p>`);
+  return `<h2>Visitors <small>${v.since ? `counting since ${day(v.since)}` : "nothing counted yet"} · admins only</small></h2>` + ledger([
+    [num(v.today.visitors), "visitors today", "gold"],
+    [num(v.today.visits), "visits today"],
+    [num(v.week.visitors), "visitors, 7 days"],
+    [num(v.month.visitors), "visitors, 30 days"],
+    [num(v.month.views), "tab views, 30 days"],
+  ]) + `<h3>Visitors a day, last 30 days</h3><div class="bars" role="img" aria-label="Visitors a day">${bars}</div>
+    <div class="bars-axis"><span>${day(v.daily[0].day)}</span><span>today</span></div>
+    <div class="cols">
+      <section><h2>Most viewed</h2>${list(v.pages, (r) => esc(PAGE_NAMES[r.page] || r.page), (r) => r.views)}</section>
+      <section><h2>Where visits came from</h2>${list(v.referrers, (r) => esc(r.host), (r) => r.visits)}
+        <p class="note">Visits typed in or opened from an app often don't say where they came from, so they aren't listed.</p></section>
+    </div>
+    <p class="note">Counted on lovelycoc.com and turtscocclan.com, without keeping anyone's IP address: a visitor is a scrambled code
+    that changes every day, so someone who visits on three days counts as three, and nobody can be traced back. Signed-in admins aren't counted.
+    Visits straight to turtdle.github.io aren't counted.</p>`;
+}
+
 // The recorded clan chat in order, like the game (newest at the bottom, where it opens); runs of messages under their speaker.
 function chatPage() {
   if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see the clan chat.</p>`;
@@ -1187,6 +1229,21 @@ const TABS = [["overview", "Overview"], ["members", "Members"], ["war", "War"], 
 
 const moved = (to) => { setTimeout(() => location.replace(to)); return ""; };
 
+// Anonymous visit counts (admin.py /visit; no IPs are kept): which tab was shown and, for the first one
+// of a visit, which site the visitor came from. Only on the clan's own domains, where the server sits
+// in front of the site.
+const COUNT_HOSTS = new Set(["lovelycoc.com", "turtscocclan.com"]);
+const COUNT_PAGES = new Set(["overview", "news", "members", "player", "war", "cwl", "streaks", "leaderboards"]);
+let firstView = true;
+function countView(page) {
+  if (!COUNT_HOSTS.has(location.hostname) || !COUNT_PAGES.has(page) || ADMIN) return;
+  let ref = "";
+  try { if (firstView && document.referrer) ref = new URL(document.referrer).hostname; } catch (e) { /* not a URL */ }
+  const body = JSON.stringify({ page, load: firstView, ref: COUNT_HOSTS.has(ref) ? "" : ref });
+  firstView = false;
+  try { navigator.sendBeacon("/visit", new Blob([body], { type: "text/plain" })); } catch (e) { /* not counted */ }
+}
+
 function route() {
   const [, page = "overview", a, b] = location.hash.split("/");
   if (ADMIN?.setup && page !== "admin") { location.hash = "#/admin/setup"; return; }
@@ -1200,6 +1257,7 @@ function route() {
   }[page] || overview;
   document.getElementById("page").innerHTML = render();
   window.scrollTo(0, 0);
+  countView(page || "overview");
 }
 
 async function main() {

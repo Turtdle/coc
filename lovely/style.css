@@ -382,6 +382,12 @@ footer .admin button { padding: 0; border: 0; background: none; font: inherit; c
 .reader .note { margin: 6px 0 0; }
 .reader .note:empty { display: none; }
 
+/* The admin Visitors page: a bar a day. */
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; margin-top: 12px; border-bottom: 1px solid var(--ink); }
+.bars span { flex: 1; min-height: 2px; background: var(--blossom); }
+.bars span.today { background: var(--accent); }
+.bars-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--muted); }
+
 /* The admin-only chat log. */
 input[type="search"] {
   min-width: 220px; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-bottom-color: var(--ink);
