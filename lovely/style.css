@@ -356,6 +356,8 @@ h3 small { margin-left: 8px; font-weight: 400; letter-spacing: .04em; text-trans
             box-shadow: 0 0 0 1px rgba(255, 255, 255, .55); pointer-events: none; }
 .base-box.other { border-style: dashed; border-color: var(--muted); box-shadow: none; }
 .base-changes { margin: 6px 0 0; max-width: 560px; color: var(--ink-2); font-size: 14px; }
+.news.upgrades { margin-top: 26px; }
+.news.upgrades li { grid-template-columns: 150px minmax(0, 1fr); }
 
 /* A member's war stats: tabs for all wars, CWL and regular wars, over one ledger. */
 .scope-tabs { display: flex; gap: 22px; margin: 30px 0 0; }

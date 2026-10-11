@@ -624,7 +624,36 @@ function baseChanges(base) {
   return `<p class="base-changes">Since ${esc(when(base.since, { month: "short", day: "numeric" }))}: ${named.length ? named.join(" · ") : "no changes spotted"}</p>`;
 }
 
-function playerPage(tag) {
+// A member's building upgrades over time, spotted by comparing their base screenshots (reader/compare.py
+// on the reader PC, logged by the gate in building_changes). Grouped by the visit that spotted them.
+function upgradesPage(tag) {
+  const m = MEMBERS.get(tag);
+  if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
+  const ups = m.upgrades || [], day = { month: "short", day: "numeric" };
+  const back = `<a class="back" href="#/player/${encodeURIComponent(tag)}">← ${esc(m.name)}</a>`;
+  let html = back + `<h2>${esc(m.name)} <small>building upgrades</small></h2>`;
+  if (!ups.length) return html + `<p class="empty">No building upgrades spotted yet.</p>`;
+  const month = Date.now() / 1000 - 30 * 86400, latest = ups[0].seen;
+  html += ledger([
+    [num(ups.length), "spotted"],
+    [num(ups.filter((u) => u.seen >= month).length), "in the last 30 days"],
+    [num(ups.filter((u) => u.seen === latest && u.change === "upgrading").length), "upgrading now"],
+  ], "three");
+  const visits = new Map();
+  for (const u of ups) {
+    const key = `${u.seen}/${u.since}`;
+    if (!visits.has(key)) visits.set(key, { seen: u.seen, since: u.since, items: [] });
+    visits.get(key).items.push(`${esc(u.building)} ${u.change}`);
+  }
+  html += `<ol class="news upgrades">${[...visits.values()].map((v) => `<li><span class="d">${esc(when(v.seen, day))} <span class="muted">· since ${esc(when(v.since, day))}</span></span>
+    <span>${v.items.join(" · ")}</span></li>`).join("")}</ol>
+    <p class="note">Compared from screenshots of the base taken about weekly. A building can be missed, or seen twice: upgrading one week,
+    upgraded the next. Walls aren't counted.</p>`;
+  return html;
+}
+
+function playerPage(tag, sub) {
+  if (sub === "upgrades") return upgradesPage(tag);
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
   const since = m.joined ? ` · in the clan since ${when(m.joined, { month: "short", day: "numeric", year: "numeric" })}` : "";
@@ -636,6 +665,9 @@ function playerPage(tag) {
     html += `<h3>Base <small>seen ${esc(seen)}</small></h3>
       <a class="shot base-shot" href="${esc(m.base.src)}" data-src="${esc(m.base.src)}" data-cap="${esc(`${m.name}'s village, ${seen}`)}">
         <img src="${esc(m.base.src.replace(/\.webp$/, "-t.webp"))}" alt="${esc(m.name)}'s village" loading="lazy">${baseBoxes(m.base)}</a>${baseChanges(m.base)}`;
+    if (m.upgrades?.length) {
+      html += `<p class="base-changes"><a class="link" href="#/player/${encodeURIComponent(tag)}/upgrades">Building upgrades spotted: ${num(m.upgrades.length)} →</a></p>`;
+    }
   }
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([
@@ -1332,7 +1364,7 @@ function route() {
   document.querySelectorAll("#tabs a").forEach((t) => t.classList.toggle("on", t.dataset.tab === current));
   const render = {
     overview, news: newsPage, members: membersPage, war: () => warPage(a), cwl: () => cwlPage(a, b), leaderboards: () => leaderboardsPage(a, b),
-    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || "")), admin: () => adminSub(a),
+    streaks: () => streaksPage(a), player: () => playerPage(decodeURIComponent(a || ""), b), admin: () => adminSub(a),
     // Old addresses of the admin pages, from before the Admin tab.
     leaders: () => moved(`#/admin${a ? `/${a}` : ""}`), chat: () => moved("#/admin/chat"),
   }[page] || overview;
