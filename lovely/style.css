@@ -387,8 +387,9 @@ input[type="search"] {
   min-width: 220px; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-bottom-color: var(--ink);
   border-radius: 0; padding: 7px 10px; font: inherit;
 }
-.chat { margin-top: 10px; border-top: 1px solid var(--ink); }
-.chat h3 { margin: 22px 0 6px; }
+.chat { margin-top: 10px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule);
+        max-height: min(72vh, 900px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
+.chat h3 { margin: 22px 0 6px; padding: 6px 0; position: sticky; top: 0; background: var(--paper); z-index: 1; }
 .chat .who { margin: 12px 0 2px; }
 .chat .who b { font-weight: 600; }
 .chat .t { color: var(--muted); font-size: 12.5px; margin-left: 6px; }

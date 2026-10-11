@@ -1096,7 +1096,7 @@ async function runReader() {
   if (m && keep) m.textContent = keep;
 }
 
-// The recorded clan chat: newest day first, each day in order, runs of messages under their speaker.
+// The recorded clan chat in order, like the game (newest at the bottom, where it opens); runs of messages under their speaker.
 function chatPage() {
   if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see the clan chat.</p>`;
   if (!CHAT) { loadChat(); return `<p class="empty">Loading the clan chat…</p>`; }
@@ -1109,7 +1109,10 @@ function chatPage() {
     if (!find) return;
     find.value = chatView.find;
     who.value = chatView.who;
-    const redraw = () => { chatView.find = find.value; chatView.who = who.value; document.getElementById("chatlog").innerHTML = chatLog(); };
+    // Like the game: oldest at the top, newest at the bottom, opened at the newest.
+    const log = document.getElementById("chatlog"), toNewest = () => { log.scrollTop = log.scrollHeight; };
+    toNewest();
+    const redraw = () => { chatView.find = find.value; chatView.who = who.value; log.innerHTML = chatLog(); toNewest(); };
     find.addEventListener("input", redraw);
     who.addEventListener("change", redraw);
   });
@@ -1121,7 +1124,7 @@ function chatPage() {
     <div class="controls"><input id="chatfind" type="search" placeholder="Find in the chat" aria-label="Find in the chat" autocomplete="off">
       <select id="chatwho" aria-label="Member"><option value="">Everyone</option>${people.map((p) => `<option value="${esc(p)}">${esc(p)} (${counts[p]})</option>`).join("")}</select></div>
     <div id="chatlog" class="chat">${chatLog()}</div>
-    <p class="note">Times are approximate (the game only says "3h ago"). Read from the game by the clan bot's reader.</p>`;
+    <p class="note">Newest at the bottom, like in the game. Times are approximate (the game only says "3h ago"). Read from the game by the clan bot's reader.</p>`;
 }
 
 function chatLog() {
@@ -1146,7 +1149,7 @@ function chatLog() {
     }
     return out + esc(text.slice(i));
   };
-  return days.reverse().map(({ day, rows: list }) => {
+  return days.map(({ day, rows: list }) => {
     let html = `<h3>${esc(day)}</h3>`, speaker = null;
     for (const r of list) {
       if (r.kind === "system" || r.kind === "donation_request") {
