@@ -225,7 +225,7 @@ function overview() {
     ${perfect.length ? `<section><h2>Perfect CWLs</h2>${rankList(perfect.map((p) => [p, num(p.perfect), p.streak > 1 ? `${p.streak} in a row` : `of ${p.shown} seasons`]))}
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
     <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, `${m.progress.per_week}<span class="muted unit">/wk</span>`, `+${num(m.progress.gained)} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]))}
-      <p class="note">Hero, troop, spell and equipment levels gained a week. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
+      <p class="note">Hero, lab (troops, spells, sieges, pets) and equipment levels upgraded a week; buildings aren't shared by the game. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
     <section><h2>Clan Games ${games ? `<small>${gameDates(games)}</small>` : ""}</h2>
       ${rankList(gamers.slice(0, 5).map((m) => [m, num(m.games.points), games.ongoing ? "so far" : ""]))}
       ${gamers.length ? `<p class="note">${num(gamers.reduce((t, m) => t + m.games.points, 0))} points from ${num(gamers.length)} members. <a class="link" href="#/leaderboards/games">Everyone</a></p>` : ""}</section>
@@ -559,6 +559,43 @@ function givePanel(m) {
     </div>`;
 }
 
+// A member's war stats, one scope at a time: tabs for all wars, CWL and regular wars (the choice is
+// kept while moving between members).
+const WAR_SCOPES = [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]];
+let warScope = "all";
+
+function warLedger(m, scope) {
+  const s = m.war[scope], d = m.defense[scope];
+  return ledger([
+    [s.attacks ? pct(s.triples / s.attacks) : "–", "3-star rate", "gold"],
+    [num(s.attacks), "attacks"],
+    [s.avg_stars.toFixed(2), "avg stars"],
+    [`${Math.round(s.avg_destruction)}%`, "avg destruction"],
+    [num(s.missed), "missed", s.missed ? "loss" : ""],
+    s.attacks >= 3 && [(s.soe > 0 ? "+" : "") + s.soe.toFixed(2), "stars vs expected", s.soe > 0 ? "win" : s.soe < 0 ? "loss" : ""],
+    d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
+    d.attacked && [num(d.attacked), "times attacked"],
+  ]);
+}
+
+function warStats(m) {
+  const scopes = WAR_SCOPES.filter(([s]) => m.war[s].wars || m.war[s].attacks || m.defense[s].attacked);
+  if (!scopes.length) return "";
+  const shown = scopes.some(([s]) => s === warScope) ? warScope : scopes[0][0];
+  setTimeout(() => {
+    const box = document.getElementById("warstats");
+    if (!box) return;
+    box.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => {
+      warScope = b.dataset.scope;
+      box.querySelectorAll("[data-scope]").forEach((x) => x.setAttribute("aria-selected", x === b));
+      box.querySelector(".scope-body").innerHTML = warLedger(m, warScope);
+    }));
+  });
+  return `<div id="warstats"><div class="scope-tabs" role="tablist" aria-label="Which wars">${scopes.map(([s, name]) =>
+    `<button type="button" role="tab" data-scope="${s}" aria-selected="${s === shown}">${name}</button>`).join("")}</div>
+    <div class="scope-body">${warLedger(m, shown)}</div></div>`;
+}
+
 function playerPage(tag) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
@@ -568,26 +605,14 @@ function playerPage(tag) {
   if (m.donations_total != null) html += givePanel(m);
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([
-      m.progress && [`+${num(m.progress.gained)}`, `upgrade levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`, "gold"],
-      m.progress && [`${m.progress.per_week}`, "levels a week"],
+      m.progress && [`+${num(m.progress.gained)}`, `levels upgraded in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`, "gold"],
+      m.progress && [`${m.progress.per_week}`, "a week at this pace"],
       m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
       m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],
-    ]);
+    ]) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine, pet and hero equipment level they upgrade counts as one,
+      from a daily check of their profile. Buildings and walls aren't counted: the game doesn't share them.</p>` : "");
   }
-  for (const [scope, name] of [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]]) {
-    const s = m.war[scope], d = m.defense[scope];
-    if (!s.attacks && !d.attacked) continue;
-    html += `<h3>${name}</h3>` + ledger([
-      [s.attacks ? pct(s.triples / s.attacks) : "–", "3-star rate", "gold"],
-      [num(s.attacks), "attacks"],
-      [s.avg_stars.toFixed(2), "avg stars"],
-      [`${Math.round(s.avg_destruction)}%`, "avg destruction"],
-      [num(s.missed), "missed", s.missed ? "loss" : ""],
-      s.attacks >= 3 && [(s.soe > 0 ? "+" : "") + s.soe.toFixed(2), "stars vs expected", s.soe > 0 ? "win" : s.soe < 0 ? "loss" : ""],
-      d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
-      d.attacked && [num(d.attacked), "times attacked"],
-    ]);
-  }
+  html += warStats(m);
   const rec = cwlRecord(tag), seasons = rec.rows;
   if (seasons.length) {
     const best = Math.min(...seasons.map((r) => r.position));
