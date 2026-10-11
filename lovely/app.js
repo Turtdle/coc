@@ -605,6 +605,25 @@ function warStats(m) {
     <div class="scope-body">${warLedger(m, shown)}</div></div>`;
 }
 
+// What changed in a member's village since the reader's previous visit (reader/compare.py): boxes drawn
+// over the screenshot, and one line naming the buildings. Patches the model couldn't name as an upgrade
+// count as "other changes" (a troop or hero standing there, a decoration).
+const boxPct = (v) => `${(Math.min(1, Math.max(0, +v || 0)) * 100).toFixed(1)}%`;
+function baseBoxes(base) {
+  if (!base.since || !Array.isArray(base.changes)) return "";
+  return base.changes.filter((c) => Array.isArray(c.box) && c.box.length === 4).map((c) => {
+    const [x1, y1, x2, y2] = c.box, label = c.building ? `${c.building} ${c.change}` : "changed";
+    return `<span class="base-box${c.change === "other" ? " other" : ""}" title="${esc(label)}" style="left:${boxPct(x1)};top:${boxPct(y1)};width:${boxPct(x2 - x1)};height:${boxPct(y2 - y1)}"></span>`;
+  }).join("");
+}
+function baseChanges(base) {
+  if (!base.since || !Array.isArray(base.changes)) return "";
+  const named = base.changes.filter((c) => c.building && c.change !== "other").map((c) => `${esc(c.building)} ${c.change}`);
+  const others = base.changes.length - named.length;
+  if (others) named.push(`${others} other change${others === 1 ? "" : "s"}`);
+  return `<p class="base-changes">Since ${esc(when(base.since, { month: "short", day: "numeric" }))}: ${named.length ? named.join(" · ") : "no changes spotted"}</p>`;
+}
+
 function playerPage(tag) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
@@ -616,7 +635,7 @@ function playerPage(tag) {
     const seen = when(m.base.taken, { month: "short", day: "numeric", year: "numeric" });
     html += `<h3>Base <small>seen ${esc(seen)}</small></h3>
       <a class="shot base-shot" href="${esc(m.base.src)}" data-src="${esc(m.base.src)}" data-cap="${esc(`${m.name}'s village, ${seen}`)}">
-        <img src="${esc(m.base.src.replace(/\.webp$/, "-t.webp"))}" alt="${esc(m.name)}'s village" loading="lazy"></a>`;
+        <img src="${esc(m.base.src.replace(/\.webp$/, "-t.webp"))}" alt="${esc(m.name)}'s village" loading="lazy">${baseBoxes(m.base)}</a>${baseChanges(m.base)}`;
   }
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([

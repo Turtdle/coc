@@ -348,9 +348,14 @@ select {
 h3 small { margin-left: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
 
 /* A member's village, from the reader's visit; opens full size in the viewer. */
-.base-shot { display: block; max-width: 560px; }
+.base-shot { display: block; position: relative; max-width: 560px; }
 .base-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); transition: border-color .15s; }
 .base-shot:hover img { border-color: var(--accent); }
+/* What changed since the previous visit: outlines over the picture (positions are inline, in percent). */
+.base-box { position: absolute; box-sizing: border-box; border: 2px solid var(--accent); border-radius: 3px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, .55); pointer-events: none; }
+.base-box.other { border-style: dashed; border-color: var(--muted); box-shadow: none; }
+.base-changes { margin: 6px 0 0; max-width: 560px; color: var(--ink-2); font-size: 14px; }
 
 /* A member's war stats: tabs for all wars, CWL and regular wars, over one ledger. */
 .scope-tabs { display: flex; gap: 22px; margin: 30px 0 0; }
