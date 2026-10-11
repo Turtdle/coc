@@ -30,6 +30,9 @@ const until = (ts) => {
   const s = Math.max(0, ts - Date.now() / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
   return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
 };
+// Progress is shown as a weekly pace only once there's a week of daily profile checks; before that,
+// just the levels upgraded so far (one day projected to a week means little).
+const weeklyPace = () => DATA.members.some((m) => m.progress?.days >= 7);
 const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th"}`;
 const ROLES = { leader: "Leader", coLeader: "Co-leader", admin: "Elder", member: "Member" };
 const ROLE_ORDER = { leader: 0, coLeader: 1, admin: 2, member: 3 };
@@ -214,7 +217,9 @@ function overview() {
     .sort((a, b) => b.war.all.triples / b.war.all.attacks - a.war.all.triples / a.war.all.attacks || b.war.all.attacks - a.war.all.attacks).slice(0, 5);
   const donors = DATA.members.filter((m) => m.donations_total).sort((a, b) => b.donations_total - a.donations_total).slice(0, 5);
   const perfect = (DATA.cwl_history?.perfect || []).slice(0, 5);
-  const fastest = DATA.members.filter((m) => m.progress?.gained > 0).sort((a, b) => b.progress.per_week - a.progress.per_week).slice(0, 5);
+  const weekly = weeklyPace();
+  const fastest = DATA.members.filter((m) => m.progress?.gained > 0)
+    .sort((a, b) => (weekly ? b.progress.per_week - a.progress.per_week : b.progress.gained - a.progress.gained)).slice(0, 5);
   const gamers = DATA.members.filter((m) => m.games?.points > 0).sort((a, b) => b.games.points - a.games.points);
   const games = DATA.members.find((m) => m.games)?.games;
   html += `<div class="cols">
@@ -224,8 +229,10 @@ function overview() {
     <section><h2>Top donors</h2>${rankList(donors.map((m) => [m, num(m.donations_total), `got ${num(m.received_total)}`]))}</section>
     ${perfect.length ? `<section><h2>Perfect CWLs</h2>${rankList(perfect.map((p) => [p, num(p.perfect), p.streak > 1 ? `${p.streak} in a row` : `of ${p.shown} seasons`]))}
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
-    <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, `${m.progress.per_week}<span class="muted unit">/wk</span>`, `+${num(m.progress.gained)} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]))}
-      <p class="note">Hero, lab (troops, spells, sieges, pets) and equipment levels upgraded a week; buildings aren't shared by the game. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
+    <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, weekly ? `${m.progress.per_week}<span class="muted unit">/wk</span>` : `+${num(m.progress.gained)}`,
+      weekly ? `+${num(m.progress.gained)} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}` : `levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]))}
+      <p class="note">Hero, lab (troops, spells, sieges, pets) and equipment levels upgraded ${weekly ? "a week" : "so far (a weekly pace shows once there's a week of data)"};
+      buildings aren't shared by the game. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
     <section><h2>Clan Games ${games ? `<small>${gameDates(games)}</small>` : ""}</h2>
       ${rankList(gamers.slice(0, 5).map((m) => [m, num(m.games.points), games.ongoing ? "so far" : ""]))}
       ${gamers.length ? `<p class="note">${num(gamers.reduce((t, m) => t + m.games.points, 0))} points from ${num(gamers.length)} members. <a class="link" href="#/leaderboards/games">Everyone</a></p>` : ""}</section>
@@ -524,10 +531,12 @@ const NOT_WARS = new Set(["donations_total", "progress", "games"]);
 
 function leaderboardsPage(metric = "triple_rate", scope = "all") {
   if (!METRICS[metric]) metric = "triple_rate";
-  const [label, value, fmt, detail] = METRICS[metric];
+  const [label, value, metricFmt, detail] = METRICS[metric];
+  const fmt = metric === "progress" && !weeklyPace() ? (v) => `+${num(v)}` : metricFmt;
   let rows;
   if (metric === "donations_total") rows = DATA.members.filter((m) => m.donations_total != null).map((m) => [m, m.donations_total, `got ${num(m.received_total)}`]);
-  else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]);
+  else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => (weeklyPace()
+    ? [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`] : [m, m.progress.gained, `levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]));
   else if (metric === "games") rows = DATA.members.filter((m) => m.games).map((m) => [m, m.games.points, m.games.ongoing ? "still going" : `${m.games.start.slice(5)} to ${m.games.end.slice(5)}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
@@ -606,7 +615,7 @@ function playerPage(tag) {
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([
       m.progress && [`+${num(m.progress.gained)}`, `levels upgraded in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`, "gold"],
-      m.progress && [`${m.progress.per_week}`, "a week at this pace"],
+      m.progress && m.progress.days >= 7 && [`${m.progress.per_week}`, "a week at this pace"],
       m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
       m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],
     ]) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine, pet and hero equipment level they upgrade counts as one,
