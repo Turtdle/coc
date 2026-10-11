@@ -64,6 +64,8 @@ function eventText(e) {
     rename: () => `<b>${esc(e.old)}</b> is now called ${n}`,
     milestone: () => `${n} ${esc(String(e.new || "").replace(/\s*\u2b50\ufe0f?\s*$/, ""))}`,
     warned: () => `${n} was warned`,
+    veteran: () => `${n} is now a clan veteran${e.new ? ` <span class="muted">· ${esc(e.new)}</span>` : ""}`,
+    unveteran: () => `${n} is no longer a clan veteran`,
   }[e.kind];
   return text ? text() : `${n}: ${esc(e.kind)}`;
 }
@@ -504,7 +506,7 @@ function membersPage() {
   return `<h2>${num(DATA.members.length)} members</h2>
     <p class="note">Donations are everything given since the bot started counting, so they don't reset each season.</p>` + table(rows, [
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
-    { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) },
+    { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetMark(m) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
     { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
     { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
@@ -605,6 +607,9 @@ function warStats(m) {
     <div class="scope-body">${warLedger(m, shown)}</div></div>`;
 }
 
+// A leader's mark of honour (veterans.py): "Veteran", or "Veteran · <title>", next to the name.
+const vetMark = (m) => (m.veteran ? ` <span class="vet">${esc(m.veteran)}</span>` : "");
+
 // What changed in a member's village since the reader's previous visit (reader/compare.py): boxes drawn
 // over the screenshot, and one line naming the buildings. Patches the model couldn't name as an upgrade
 // count as "other changes" (a troop or hero standing there, a decoration).
@@ -657,7 +662,7 @@ function playerPage(tag, sub) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
   const since = m.joined ? ` · in the clan since ${when(m.joined, { month: "short", day: "numeric", year: "numeric" })}` : "";
-  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
+  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}${vetMark(m)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
   if (ADMIN) html += leaderBox(tag);
   if (m.donations_total != null) html += givePanel(m);
   if (m.base) {
@@ -780,8 +785,8 @@ async function checkAdmin() {
 // The admin's own pages: first sign-in (choose a password, add the authenticator), the owner's
 // user list, and changing a password. All talk to admin.py on this origin.
 // The Admin tab: signed out, the sign-in form; signed in, a sub-menu over everything admins see.
-const ADMIN_PAGES = [["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"], ["chat", "Chat log"],
-  ["visits", "Visitors"], ["users", "Users", "owner"], ["password", "Password"]];
+const ADMIN_PAGES = [["", "Housekeeping"], ["log", "Member log"], ["strikes", "Strikes"], ["veterans", "Veterans"],
+  ["chat", "Chat log"], ["visits", "Visitors"], ["users", "Users", "owner"], ["password", "Password"]];
 
 function adminNav(sub) {
   const items = ADMIN.setup ? [] : ADMIN_PAGES.filter(([, , only]) => !only || ADMIN.role === only);
@@ -792,8 +797,8 @@ function adminNav(sub) {
 function adminSub(sub) {
   if (!ADMIN) return adminPage();
   if (ADMIN.setup || sub === "setup") return adminNav("setup") + setupPage();
-  const page = { log: () => leadersPage("log"), strikes: () => leadersPage("strikes"), chat: chatPage, visits: visitsPage,
-    users: usersPage, password: passwordPage }[sub] || (() => leadersPage(""));
+  const page = { log: () => leadersPage("log"), strikes: () => leadersPage("strikes"), veterans: () => leadersPage("veterans"),
+    chat: chatPage, visits: visitsPage, users: usersPage, password: passwordPage }[sub] || (() => leadersPage(""));
   return adminNav(sub) + page();
 }
 
@@ -1029,14 +1034,16 @@ async function loadLeader() {
   if (/^#\/(admin|player)\b/.test(location.hash)) route();
 }
 
+// Veterans are out of every filter but their own (bot/leaders.py keep()).
 const HK_FILTERS = {
-  all: ["Everyone, most in need of a look first", () => true], quiet: ["Quiet for 7+ days", (r) => r.quiet >= 7],
-  out: ["War preference: out", (r) => r.war === "out"], missed: ["Missed attacks lately", (r) => r.missed > 0],
-  strikes: ["Has strikes (30 days)", (r) => r.strikes > 0], new: ["Joined in the last 14 days", (r) => r.new],
+  all: ["Everyone, most in need of a look first", (r) => !r.veteran], quiet: ["Quiet for 7+ days", (r) => !r.veteran && r.quiet >= 7],
+  out: ["War preference: out", (r) => !r.veteran && r.war === "out"], missed: ["Missed attacks lately", (r) => !r.veteran && r.missed > 0],
+  strikes: ["Has strikes (30 days)", (r) => !r.veteran && r.strikes > 0], new: ["Joined in the last 14 days", (r) => !r.veteran && r.new],
+  veterans: ["Veterans (not listed elsewhere)", (r) => !!r.veteran],
 };
 const LOG_KINDS = {
   "": ["Everything", () => true], members: ["Joins and leaves", (e) => ["join", "rejoin", "leave"].includes(e.kind)],
-  roles: ["Promotions and demotions", (e) => ["promote", "demote"].includes(e.kind)],
+  roles: ["Promotions, demotions, veterans", (e) => ["promote", "demote", "veteran", "unveteran"].includes(e.kind)],
   upgrades: ["Upgrades, milestones, renames", (e) => ["th", "milestone", "rename"].includes(e.kind)],
   warned: ["Warnings", (e) => e.kind === "warned"],
 };
@@ -1047,7 +1054,55 @@ function leadersPage(sub) {
   if (!ADMIN) return `<p class="empty">Sign in (<a class="link" href="#/admin">admin</a>) to see this.</p>`;
   if (!LEADER) { loadLeader(); return `<p class="empty">Loading…</p>`; }
   if (LEADER.error) return `<p class="empty">${esc(LEADER.error)}</p>`;
-  return sub === "log" ? memberLogPage() : sub === "strikes" ? strikesPage() : housekeepingPage();
+  return sub === "log" ? memberLogPage() : sub === "strikes" ? strikesPage() : sub === "veterans" ? veteransPage() : housekeepingPage();
+}
+
+// Veterans (veterans.py): who they are, and making or unmaking one. The Discord role, if one is set,
+// follows within the hour (the site can't touch Discord).
+async function veteranPost(path, body) {
+  const r = await adminPost(path, body);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(data.error || "That didn't work."); return false; }
+  LEADER = null;
+  loadLeader();
+  return true;
+}
+
+function veteransPage() {
+  const vets = LEADER.veterans || [], here = vets.filter((v) => v.in_clan);
+  const taken = new Set(vets.map((v) => v.tag));
+  const pick = [...MEMBERS.values()].filter((m) => !taken.has(m.tag)).sort((a, b) => a.name.localeCompare(b.name));
+  setTimeout(() => {
+    const form = document.getElementById("addvet");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const tag = form.elements.tag.value, title = form.elements.title.value;
+      if (!tag) return;
+      form.querySelector("button[type=submit]").disabled = true;
+      if (!(await veteranPost("/admin/api/veterans/add", { tag, title }))) form.querySelector("button[type=submit]").disabled = false;
+    });
+    document.querySelectorAll("[data-unvet]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm(`Take ${b.dataset.name}'s veteran mark back?`)) return;
+      await veteranPost("/admin/api/veterans/remove", { tag: b.dataset.unvet });
+    }));
+  });
+  let html = `<h2>Veterans <small>${num(here.length)} in the clan · admins only</small></h2>`;
+  html += vets.length ? table(vets, [
+    { label: "Member", key: (v) => v.name.toLowerCase(), html: (v) => `${who(v.tag, v.name)}${v.in_clan ? "" : ` <span class="muted">(left)</span>`}` },
+    { label: "Title", key: (v) => v.title, html: (v) => (v.title ? esc(v.title) : `<span class="muted">–</span>`) },
+    { label: "Since", key: (v) => v.since, html: (v) => when(v.since, { month: "short", day: "numeric", year: "numeric" }) },
+    { label: "By", key: (v) => v.by, html: (v) => `<span class="muted">${esc(v.by)}</span>` },
+    { label: "", key: () => 0, html: (v) => `<button type="button" class="mode" data-unvet="${esc(v.tag)}" data-name="${esc(v.name)}">remove</button>`, num: true },
+  ], "since", 1) : `<p class="empty">No veterans yet.</p>`;
+  html += `<form id="addvet" class="controls"><select name="tag" aria-label="Member"><option value="">Make a veteran…</option>${pick.map((m) =>
+    `<option value="${esc(m.tag)}">${esc(m.name)}</option>`).join("")}</select>
+    <input name="title" type="text" maxlength="${LEADER.veteran_title_max || 40}" placeholder="Title (optional), e.g. Founding member">
+    <button type="submit" class="mode">Add</button></form>
+    <p class="note">A veteran gets the mark next to their name on the site and in the bot, and stays out of housekeeping's lists
+    (there's a Veterans filter). Becoming one is posted as clan news. A veteran who leaves keeps the mark for if they come back;
+    it's hidden meanwhile. In Discord: <b>/veteran</b>, and <b>/veteranrole</b> for a role.</p>`;
+  return html;
 }
 
 function housekeepingPage() {
@@ -1065,6 +1120,7 @@ function housekeepingPage() {
     [num(count("missed")), "missed attacks lately", count("missed") ? "loss" : ""],
     [num(count("strikes")), "with strikes (30 days)"],
     [num(count("new")), "joined in 14 days"],
+    count("veterans") && [num(count("veterans")), "veterans not listed"],
   ]) + `<div class="controls"><select id="hkhow" aria-label="Show">${Object.entries(HK_FILTERS).map(([k, [v]]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
     <div id="hk">${hkTable()}</div>
     <p class="note">Last played is worked out from the API (donations, XP, war attacks, builder base), since the game has no "last online"; it's only kept for current members.
@@ -1076,7 +1132,7 @@ function hkTable() {
   const rows = LEADER.housekeeping.filter(HK_FILTERS[leaderView.how][1]);
   if (!rows.length) return `<p class="empty">Nobody.</p>`;
   return table(rows, [
-    { label: "Member", key: (r) => r.name.toLowerCase(), html: (r) => `${th(r.th, "small")} ${who(r.tag, r.name)} <span class="role ${esc(r.role)}">${ROLES[r.role] || ""}</span>` },
+    { label: "Member", key: (r) => r.name.toLowerCase(), html: (r) => `${th(r.th, "small")} ${who(r.tag, r.name)} <span class="role ${esc(r.role)}">${ROLES[r.role] || ""}</span>${vetMark(r)}` },
     { label: "Last played", key: (r) => -r.quiet, html: (r) => `<span class="${r.quiet >= 7 ? "loss" : r.seen ? "" : "muted"}">${played(r)}</span>` },
     { label: "War", key: (r) => (r.war === "out" ? 0 : 1), html: (r) => (r.war === "out" ? `<span class="loss">out</span>` : r.war ? "in" : `<span class="muted">–</span>`) },
     { label: "Missed", key: (r) => r.missed, html: (r) => (r.wars ? `<span class="${r.missed ? "loss" : "muted"}">${r.missed}/${r.wars}</span>` : `<span class="muted">–</span>`), num: true },
@@ -1148,6 +1204,22 @@ function leaderBox(tag) {
   }
   if (strikes.length) html += `<h3>Strikes</h3>` + strikeTable(strikes);
   if (log.length) html += `<h3>Member log</h3>` + newsList(log, true);
+  // Veteran: one click to make or unmake (a title is asked for when making).
+  const v = (LEADER.veterans || []).find((x) => x.tag === tag);
+  setTimeout(() => {
+    const b = document.getElementById("vetbtn");
+    if (!b) return;
+    b.addEventListener("click", async () => {
+      if (v) {
+        if (confirm(`Take ${b.dataset.name}'s veteran mark back?`)) await veteranPost("/admin/api/veterans/remove", { tag });
+      } else {
+        const title = prompt("A title to show with the mark (optional), e.g. Founding member", "");
+        if (title !== null) await veteranPost("/admin/api/veterans/add", { tag, title });
+      }
+    });
+  });
+  const m = MEMBERS.get(tag);
+  html += `<p class="note">${v ? `Clan veteran since ${esc(when(v.since, { month: "short", day: "numeric", year: "numeric" }))} (by ${esc(v.by)}). ` : ""}<button type="button" class="mode" id="vetbtn" data-name="${esc(m ? m.name : "")}">${v ? "Remove veteran" : "Make a veteran"}</button></p>`;
   return html + `</section>`;
 }
 
