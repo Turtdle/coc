@@ -612,6 +612,12 @@ function playerPage(tag) {
   let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
   if (ADMIN) html += leaderBox(tag);
   if (m.donations_total != null) html += givePanel(m);
+  if (m.base) {
+    const seen = when(m.base.taken, { month: "short", day: "numeric", year: "numeric" });
+    html += `<h3>Base <small>seen ${esc(seen)}</small></h3>
+      <a class="shot base-shot" href="${esc(m.base.src)}" data-src="${esc(m.base.src)}" data-cap="${esc(`${m.name}'s village, ${seen}`)}">
+        <img src="${esc(m.base.src.replace(/\.webp$/, "-t.webp"))}" alt="${esc(m.name)}'s village" loading="lazy"></a>`;
+  }
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([
       m.progress && [`+${num(m.progress.gained)}`, `levels upgraded in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`, "gold"],
@@ -666,6 +672,15 @@ function setupViewer() {
   document.getElementById("page").addEventListener("click", (e) => {
     const a = e.target.closest("a.shot");
     if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;  // ctrl-click still opens a tab
+    if (a.dataset.src) {  // one picture (a member's base)
+      e.preventDefault();
+      viewer.shots = [a.dataset.src];
+      document.getElementById("viewer-cap").textContent = a.dataset.cap || "";
+      d.classList.add("single");
+      showShot(0);
+      d.showModal();
+      return;
+    }
     const s = (DATA.streaks || []).find((x) => x.id === +a.dataset.id);
     if (!s) return;
     e.preventDefault();

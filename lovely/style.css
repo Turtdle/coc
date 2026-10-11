@@ -347,6 +347,11 @@ select {
 .player-head p { margin: 4px 0 0; color: var(--ink-2); }
 h3 small { margin-left: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
 
+/* A member's village, from the reader's visit; opens full size in the viewer. */
+.base-shot { display: block; max-width: 560px; }
+.base-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); transition: border-color .15s; }
+.base-shot:hover img { border-color: var(--accent); }
+
 /* A member's war stats: tabs for all wars, CWL and regular wars, over one ledger. */
 .scope-tabs { display: flex; gap: 22px; margin: 30px 0 0; }
 .scope-tabs button { padding: 0 0 4px; border: 0; border-bottom: 1px solid transparent; background: none; cursor: pointer;
