@@ -1047,7 +1047,13 @@ const LOG_KINDS = {
   upgrades: ["Upgrades, milestones, renames", (e) => ["th", "milestone", "rename"].includes(e.kind)],
   warned: ["Warnings", (e) => e.kind === "warned"],
 };
-const played = (r) => (r.seen ? (r.quiet < 1 ? "today" : `${Math.round(r.quiet)}d ago`) : `not in ${Math.round(r.quiet)}d`);
+// "Last played" in plain words. Without any sign of play since the bot started watching (or since they
+// joined), the days are a floor: "N+ days ago".
+const played = (r) => {
+  const d = Math.round(r.quiet), days = (n, plus = "") => `${n}${plus} day${n === 1 ? "" : "s"} ago`;
+  if (r.seen) return r.quiet < 1 ? "today" : days(d);
+  return `<span title="No play seen since the bot started watching">${days(Math.max(1, d), "+")}</span>`;
+};
 
 // Leaders only (admin.py, never data.json): housekeeping, the full member log and strikes.
 function leadersPage(sub) {
