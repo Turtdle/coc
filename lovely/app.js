@@ -224,7 +224,7 @@ function overview() {
     <section><h2>Top donors</h2>${rankList(donors.map((m) => [m, num(m.donations_total), `got ${num(m.received_total)}`]))}</section>
     ${perfect.length ? `<section><h2>Perfect CWLs</h2>${rankList(perfect.map((p) => [p, num(p.perfect), p.streak > 1 ? `${p.streak} in a row` : `of ${p.shown} seasons`]))}
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
-    <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, `${m.progress.per_week}<span class="muted unit">/wk</span>`, `+${num(m.progress.gained)} levels in ${m.progress.days} days`]))}
+    <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, `${m.progress.per_week}<span class="muted unit">/wk</span>`, `+${num(m.progress.gained)} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]))}
       <p class="note">Hero, troop, spell and equipment levels gained a week. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
     <section><h2>Clan Games ${games ? `<small>${gameDates(games)}</small>` : ""}</h2>
       ${rankList(gamers.slice(0, 5).map((m) => [m, num(m.games.points), games.ongoing ? "so far" : ""]))}
@@ -527,7 +527,7 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
   const [label, value, fmt, detail] = METRICS[metric];
   let rows;
   if (metric === "donations_total") rows = DATA.members.filter((m) => m.donations_total != null).map((m) => [m, m.donations_total, `got ${num(m.received_total)}`]);
-  else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} days`]);
+  else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]);
   else if (metric === "games") rows = DATA.members.filter((m) => m.games).map((m) => [m, m.games.points, m.games.ongoing ? "still going" : `${m.games.start.slice(5)} to ${m.games.end.slice(5)}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
@@ -543,19 +543,32 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
 
+// Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.
+function givePanel(m) {
+  const given = m.donations_total || 0, got = m.received_total || 0;
+  const head = `<h3>Donations <small>since ${esc(when(m.tracked_since, { month: "short", day: "numeric", year: "numeric" }))}</small></h3>`;
+  if (!given && !got) return head + `<p class="note">Nothing donated or received yet.</p>`;
+  const rank = DATA.members.filter((x) => (x.donations_total || 0) > given).length + 1;
+  const ratio = !got ? "hasn't needed any troops yet" : !given ? "hasn't donated yet"
+    : given >= got ? `gives ${(given / got).toFixed(1)} troops for every 1 received` : `receives ${(got / given).toFixed(1)} troops for every 1 given`;
+  const share = Math.round((given / (given + got)) * 100);
+  return head + `<div class="give" role="img" aria-label="Donated ${num(given)}, received ${num(got)}">
+      <div class="give-nums"><span><b>${num(given)}</b> donated</span><span><b>${num(got)}</b> received</span></div>
+      <div class="give-bar"><span class="given" style="flex-grow:${given}"></span><span class="got" style="flex-grow:${got}"></span></div>
+      <p class="note">${share}% given · ${ratio}${given ? ` · ${rank === 1 ? "the" : ordinal(rank)} most donated in the clan` : ""}</p>
+    </div>`;
+}
+
 function playerPage(tag) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
   const since = m.joined ? ` · in the clan since ${when(m.joined, { month: "short", day: "numeric", year: "numeric" })}` : "";
   let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
   if (ADMIN) html += leaderBox(tag);
-  html += ledger([
-    m.donations_total != null && [num(m.donations_total), `donated since ${when(m.tracked_since)}`, "gold"],
-    m.donations_total != null && [num(m.received_total), "received"],
-  ]);
+  if (m.donations_total != null) html += givePanel(m);
   if (m.progress || m.games) {
     html += `<h3>Progress</h3>` + ledger([
-      m.progress && [`+${num(m.progress.gained)}`, `upgrade levels in ${m.progress.days} days`, "gold"],
+      m.progress && [`+${num(m.progress.gained)}`, `upgrade levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`, "gold"],
       m.progress && [`${m.progress.per_week}`, "levels a week"],
       m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
       m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],

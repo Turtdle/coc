@@ -345,6 +345,20 @@ select {
 .player-head img.th { width: 72px; height: 72px; }
 .player-head h2 { margin: 0; font-size: 40px; }
 .player-head p { margin: 4px 0 0; color: var(--ink-2); }
+h3 small { margin-left: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
+
+/* A member's donations: donated and received as one bar split between the two. */
+.give { margin-top: 4px; }
+.give-nums { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--muted);
+             letter-spacing: .06em; text-transform: uppercase; }
+.give-nums b { display: inline-block; margin-right: 6px; font: 500 27px/1.1 var(--display); color: var(--ink);
+               letter-spacing: 0; text-transform: none; font-variation-settings: "opsz" 72; }
+.give-nums span:first-child b { color: var(--accent); }
+.give-bar { display: flex; height: 14px; margin-top: 8px; border-radius: 7px; overflow: hidden; background: var(--rule); gap: 2px; }
+.give-bar span { min-width: 0; }
+.give-bar .given { background: var(--accent); }
+.give-bar .got { background: var(--blossom); }
+.give .note { margin: 8px 0 0; }
 
 footer { max-width: 1040px; margin: 56px auto 0; padding: 18px 20px 40px; border-top: 1px solid var(--rule);
          color: var(--muted); font-size: 12.5px; }
