@@ -614,17 +614,35 @@ function toned(value, range, text) {
 }
 const pts = (v) => num(Math.round(v || 0));
 
-// A rating on the clan's scale: a bar from the clan's lowest to highest (members with 3+ hits), with a
-// marker where this member is.
+// How a rating adds up (wars.py rating_breakdown): one line per pair of Town Halls, each with an "i" that
+// shows the calculation on hover (or tap).
+const tip = (text) => `<span class="tip" tabindex="0" role="note" aria-label="${esc(text)}" data-tip="${esc(text)}">i</span>`;
+const thGap = (g) => (g === 0 ? "same TH" : `${Math.abs(g)} TH ${g > 0 ? "up" : "down"}`);
+const n1 = (x) => (Math.round(x * 10) / 10).toString();
+function ratingParts(which, groups, rating) {
+  if (!groups?.length) return "";
+  const hits = groups.reduce((s, g) => s + g.hits, 0), total = groups.reduce((s, g) => s + g.scored * g.each, 0);
+  const lines = groups.map((g) => which === "attack"
+    ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.scored} of ${g.hits} three-starred × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
+      tip(`One three-star here: 100 × ${g.gap_weight} (${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base; 10% less per level below TH18) = ${n1(g.each)} points. Hits that don't three-star score 0.`)}</li>`
+    : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
+      tip(`One hold here: 100 × ${g.gap_weight} (attacker ${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base: holds count more at lower Town Halls, at most 3x) = ${n1(g.each)} points. Three-starred hits score 0.`)}</li>`);
+  return `<ul class="rating-parts">${lines.join("")}<li class="sum">${n1(total)} points ÷ ${hits} ${which === "attack" ? "hits" : "times attacked"} = <b>${pts(rating)}</b>${
+    tip("The rating is the average points per hit, with misses counting 0. Free hits (on a base already three-starred, in regular wars) aren't counted.")}</li></ul>`;
+}
+
+// A rating on the clan's scale: a bar from the clan's lowest to highest (members with 5+ hits), with a
+// marker where this member is, and how it adds up.
 function ratingBar(m, scope, which) {
   const [label, value, hits, unit] = RATINGS[which];
   const s = m.war[scope], d = m.defense[scope], v = value(s, d), n = hits(s, d), range = clanRange(scope, which);
   if (!n || typeof v !== "number") return "";  // (data from before the ratings existed: nothing, not a 0)
-  const few = n < MIN_HITS ? ` <span class="muted">· few ${unit} yet</span>` : "";
+  // The bar's ends only count members with RANGE_HITS+ hits, so a few lucky hits can't stretch everyone's scale.
+  const few = n < RANGE_HITS ? ` <span class="muted">· under ${RANGE_HITS} ${unit}, so not on the clan scale yet</span>` : "";
   const bar = range ? `<div class="rating-bar"><span class="rating-mark" style="left:${(place(v, range) * 100).toFixed(1)}%"></span></div>
-    <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)}</span></div>` : "";
+    <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)} <span class="muted">(${RANGE_HITS}+ hits)</span></span></div>` : "";
   return `<div class="rating"><div class="rating-head"><span>${label}</span><b>${toned(v, range, pts(v))}</b>
-    <small>${num(n)} ${unit}${few}</small></div>${bar}</div>`;
+    <small>${num(n)} ${unit}${few}</small></div>${bar}${ratingParts(which, which === "attack" ? s.breakdown : d.breakdown, v)}</div>`;
 }
 
 function warLedger(m, scope) {

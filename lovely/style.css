@@ -202,6 +202,21 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
 .rating-mark { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; border-radius: 2px;
                background: var(--ink); box-shadow: 0 0 0 2px var(--paper); }
 .rating-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.rating-parts { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+.rating-parts li { padding: 4px 0; border-bottom: 1px dotted var(--rule); }
+.rating-parts li.sum { border-bottom: 0; color: var(--ink); }
+.rating-parts b { font-weight: 600; color: var(--ink); }
+/* A small "i" whose calculation shows on hover, or on tap (focus) on a phone. */
+.tip { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px;
+       border: 1px solid var(--muted); border-radius: 50%; color: var(--muted); font: 600 10px/1 var(--text);
+       font-style: italic; cursor: help; vertical-align: 1px; }
+.tip:hover, .tip:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+.tip:hover::after, .tip:focus::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 7px); right: -8px; z-index: 20;
+  width: max-content; max-width: min(300px, 80vw); padding: 8px 10px; border-radius: 4px;
+  background: var(--ink); color: var(--paper); font: 400 12.5px/1.45 var(--text); font-style: normal;
+  text-align: left; white-space: normal; box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+}
 /* A clan veteran's mark (veterans.py): a small sakura pill next to the name. */
 .vet { display: inline-block; margin-left: 8px; padding: 2px 9px 1px; border-radius: 999px; background: var(--vet-bg);
        border: 1px solid var(--vet-edge); color: var(--accent); font: 600 10.5px/1.5 var(--text); letter-spacing: .1em;
