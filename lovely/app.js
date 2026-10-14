@@ -591,8 +591,8 @@ function givePanel(m) {
 const WAR_SCOPES = [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]];
 let warScope = "all";
 
-// Attack and defence ratings (wars.py ratings): points per hit. A three-star scores 100 for TH18 on TH18,
-// more hitting up (one TH 1.2x, two 1.4x, three 1.7x), less hitting down or at lower Town Halls (10% less per
+// Attack and defence ratings (wars.py ratings): points per hit. Attack: each hit's result (stars + destruction)
+// against what's expected for the Town Hall gap, 100 for meeting it at TH18; less hitting down or at lower Town Halls (10% less per
 // level below 18). A hold scores 100 for a TH18 holding against a TH18, more against stronger attackers and
 // at lower Town Halls, where bases are easier to three-star. Shown against the clan: worst red, best green.
 const MIN_HITS = 3;
@@ -626,14 +626,16 @@ const thGap = (g) => (g === 0 ? "same TH" : `${Math.abs(g)} TH ${g > 0 ? "up" : 
 const n1 = (x) => (Math.round(x * 10) / 10).toString();
 function ratingParts(which, groups, rating) {
   if (!groups?.length) return "";
-  const hits = groups.reduce((s, g) => s + g.hits, 0), total = groups.reduce((s, g) => s + g.scored * g.each, 0);
+  const hits = groups.reduce((s, g) => s + g.hits, 0);
+  const total = groups.reduce((s, g) => s + (which === "attack" ? g.points : g.scored * g.each), 0);
   const lines = groups.map((g) => which === "attack"
-    ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.scored} of ${g.hits} three-starred × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
-      tip(`One three-star here: 100 × ${g.gap_weight} (${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base; 10% less per level below TH18) = ${n1(g.each)} points. Hits that don't three-star score 0.`)}</li>`
+    ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.hits} hit${g.hits === 1 ? "" : "s"}, average ${(g.score / g.hits).toFixed(2)} vs ${g.expected.toFixed(1)} expected = <b>${n1(g.points)}</b>${
+      tip(`Each hit scores stars + destruction: a three-star is 4.0, two stars at 95% is 2.95. A TH${g.att_th} on a TH${g.def_th} (${thGap(g.gap)}) is expected to score ${g.expected.toFixed(1)}${g.expected === 4 ? " (a three-star)" : ""}. Points per hit = score ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (a TH${g.def_th} base; 10% less per level below TH18)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}. These ${g.hits}: ${g.triples} three-star${g.triples === 1 ? "" : "s"}, average score ${(g.score / g.hits).toFixed(2)}.`)}</li>`
     : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
       tip(`One hold here: 100 × ${g.gap_weight} (attacker ${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base: holds count more at lower Town Halls, at most 3x) = ${n1(g.each)} points. Three-starred hits score 0.`)}</li>`);
   return `<ul class="rating-parts">${lines.join("")}<li class="sum">${n1(total)} points ÷ ${hits} ${which === "attack" ? "hits" : "times attacked"} = <b>${pts(rating)}</b>${
-    tip("The rating is the average points per hit, with misses counting 0. Free hits (on a base already three-starred, in regular wars) aren't counted.")}</li></ul>`;
+    tip(which === "attack" ? "The rating is the average points per hit. Free hits (on a base already three-starred, in regular wars) aren't counted."
+      : "The rating is the average points per hit, with three-starred hits counting 0. Free hits (on a base already three-starred, in regular wars) aren't counted.")}</li></ul>`;
 }
 
 // A rating on the clan's scale: a bar from the clan's lowest to highest (everyone with hits), with a
@@ -661,9 +663,10 @@ function warLedger(m, scope) {
     d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
     d.attacked && [num(d.attacked), "times attacked"],
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
-    <p class="note">Ratings are points per hit. 100 is a TH18 three-starring a TH18 (attack) or holding against one (defense).
-    Hitting a higher Town Hall, or holding against a stronger attacker, scores more. Lower Town Halls are easier to
-    three-star, so there a three-star scores less and a hold more. The bar runs from the clan's lowest to highest.</p>`);
+    <p class="note">Ratings are points per hit. Attack: each hit's stars and destruction against what's expected for the Town
+    Hall gap (a three-star at the same TH, a high two-star three up, a one-star six up); meeting that is 100 at TH18. Defense:
+    100 is a TH18 holding against a TH18, more against stronger attackers. Lower Town Halls are easier to three-star, so
+    there attacks score less and holds more. The bar runs from the clan's lowest to highest.</p>`);
 }
 
 function warStats(m) {
