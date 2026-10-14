@@ -243,7 +243,7 @@ function overview() {
       <p class="note"><a class="link" href="#/cwl/history">Every season</a></p></section>` : ""}
     <section><h2>Fastest progress</h2>${rankList(fastest.map((m) => [m, weekly ? `${m.progress.per_week}<span class="muted unit">/wk</span>` : `+${num(m.progress.gained)}`,
       weekly ? `+${num(m.progress.gained)} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}` : `levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]))}
-      <p class="note">Hero, lab (troops, spells, sieges, pets) and equipment levels upgraded ${weekly ? "a week" : "so far (a weekly pace shows once there's a week of data)"};
+      <p class="note">Hero and lab (troops, spells, sieges, pets) levels upgraded ${weekly ? "a week" : "so far (a weekly pace shows once there's a week of data)"};
       buildings aren't shared by the game. <a class="link" href="#/leaderboards/progress">Everyone</a></p></section>
     <section><h2>Clan Games ${games ? `<small>${gameDates(games)}</small>` : ""}</h2>
       ${rankList(gamers.slice(0, 5).map((m) => [m, num(m.games.points), games.ongoing ? "so far" : ""]))}
@@ -760,7 +760,7 @@ function playerPage(tag, sub) {
       m.progress && m.progress.days >= 7 && [`${m.progress.per_week}`, "a week at this pace"],
       m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
       m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],
-    ]) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine, pet and hero equipment level they upgrade counts as one,
+    ]) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine and pet level they upgrade counts as one (hero equipment isn't counted for now),
       from a daily check of their profile. Buildings and walls aren't counted: the game doesn't share them.</p>` : "");
   }
   html += warStats(m);
