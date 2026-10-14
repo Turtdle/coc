@@ -625,9 +625,13 @@ const thGap = (g) => (g === 0 ? "same TH" : `${Math.abs(g)} TH ${g > 0 ? "up" : 
 const n1 = (x) => (Math.round(x * 10) / 10).toString();
 function ratingParts(which, groups, rating) {
   if (!groups?.length) return "";
-  const hits = groups.reduce((s, g) => s + g.hits, 0);
-  const total = groups.reduce((s, g) => s + (which === "attack" ? g.points : g.scored * g.each), 0);
-  const lines = groups.map((g) => which === "attack"
+  const counted = groups.filter((g) => !g.cleanup);
+  const hits = counted.reduce((s, g) => s + g.hits, 0);
+  const total = counted.reduce((s, g) => s + (which === "attack" ? g.points : g.scored * g.each), 0);
+  const lines = groups.map((g) => which === "attack" && g.cleanup
+    ? `<li class="muted">TH${g.att_th} on TH${g.def_th} (${thGap(g.gap)}): ${g.hits} hit${g.hits === 1 ? "" : "s"}, clean-up, not counted${
+      tip("Hitting 3 or more Town Halls down is cleaning up a bottom base: it doesn't count for or against the attack rating.")}</li>`
+    : which === "attack"
     ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.hits} hit${g.hits === 1 ? "" : "s"}, average ${(g.score / g.hits).toFixed(2)} vs ${g.expected.toFixed(1)} expected = <b>${n1(g.points)}</b>${
       tip(`Each hit scores stars + destruction: a three-star is 4.0, two stars at 95% is 2.95. A TH${g.att_th} on a TH${g.def_th} (${thGap(g.gap)}) is expected to score ${g.expected.toFixed(1)}${g.expected === 4 ? " (a three-star)" : ""}. Points per hit = score ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (a TH${g.def_th} base; 10% less per level below TH18)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}. These ${g.hits}: ${g.triples} three-star${g.triples === 1 ? "" : "s"}, average score ${(g.score / g.hits).toFixed(2)}.`)}</li>`
     : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
