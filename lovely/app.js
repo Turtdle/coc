@@ -622,6 +622,15 @@ const pts = (v) => num(Math.round(v || 0));
 // shows the calculation on hover (or tap).
 const tip = (text) => `<span class="tip" tabindex="0" role="note" aria-label="${esc(text)}" data-tip="${esc(text)}">i</span>`;
 const thGap = (g) => (g === 0 ? "same TH" : `${Math.abs(g)} TH ${g > 0 ? "up" : "down"}`);
+// What's par for a hit, in words, by Town Hall gap (wars.py EXPECTED_SCORE).
+const PAR = { 0: "a three-star", 1: "a three-star most of the time", 2: "a high 2-star, sometimes a 3", 3: "a high 2-star",
+  4: "a 2-star", 5: "a low 2-star", 6: "a 1-star", 7: "a 1-star" };
+const par = (gap) => PAR[Math.max(0, Math.min(7, gap))];
+const STAR_WORDS = ["zero", "one", "two", "three"];
+function results(g) {  // "3 three-stars, 2 two-stars (avg 94%)"
+  const parts = [3, 2, 1, 0].filter((s) => g.by_stars?.[s]).map((s) => `${g.by_stars[s]} ${STAR_WORDS[s]}-star${g.by_stars[s] === 1 ? "" : "s"}`);
+  return `${parts.join(", ")}${g.by_stars?.[3] === g.hits ? "" : ` <span class="muted">(avg ${g.avg_destruction}%)</span>`}`;
+}
 const n1 = (x) => (Math.round(x * 10) / 10).toString();
 function ratingParts(which, groups, rating) {
   if (!groups?.length) return "";
@@ -632,8 +641,8 @@ function ratingParts(which, groups, rating) {
     ? `<li class="muted">TH${g.att_th} on TH${g.def_th} (${thGap(g.gap)}): ${g.hits} hit${g.hits === 1 ? "" : "s"}, clean-up, not counted${
       tip("Hitting 3 or more Town Halls down is cleaning up a bottom base: it doesn't count for or against the attack rating.")}</li>`
     : which === "attack"
-    ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.hits} hit${g.hits === 1 ? "" : "s"}, average ${(g.score / g.hits).toFixed(2)} vs ${g.expected.toFixed(1)} expected = <b>${n1(g.points)}</b>${
-      tip(`Each hit scores stars + destruction: a three-star is 4.0, two stars at 95% is 2.95. A TH${g.att_th} on a TH${g.def_th} (${thGap(g.gap)}) is expected to score ${g.expected.toFixed(1)}${g.expected === 4 ? " (a three-star)" : ""}. Points per hit = score ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (a TH${g.def_th} base; 10% less per level below TH18)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}. These ${g.hits}: ${g.triples} three-star${g.triples === 1 ? "" : "s"}, average score ${(g.score / g.hits).toFixed(2)}.`)}</li>`
+    ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.by_stars ? results(g) : `${g.hits} hit${g.hits === 1 ? "" : "s"}`}. <span class="muted">Par: ${par(g.gap)}.</span> → <b>${n1(g.points)}</b> pts${
+      tip(`Hitting at par scores 100 points (on a TH18; 10% less per level below). The maths: each hit's result is its stars plus destruction ÷ 100 (a three-star is 4.0, a 2-star at 95% is 2.95), and par here (${par(g.gap)}) is ${g.expected.toFixed(1)}. Points = result ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (TH${g.def_th} level)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}. These ${g.hits} hits averaged ${(g.score / g.hits).toFixed(2)}, so ${n1(g.points / g.hits)} each.`)}</li>`
     : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
       tip(`One hold here: 100 × ${g.gap_weight} (attacker ${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base: holds count more at lower Town Halls, at most 3x) = ${n1(g.each)} points. Three-starred hits score 0.`)}</li>`);
   return `<ul class="rating-parts">${lines.join("")}<li class="sum">${n1(total)} points ÷ ${hits} ${which === "attack" ? "hits" : "times attacked"} = <b>${pts(rating)}</b>${
@@ -665,8 +674,8 @@ function warLedger(m, scope) {
     d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
     d.attacked && [num(d.attacked), "times attacked"],
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
-    <p class="note">Ratings are points per hit. Attack: each hit's stars and destruction against what's expected for the Town
-    Hall gap (a three-star at the same TH, a high two-star three up, a one-star six up); meeting that is 100 at TH18. Defense:
+    <p class="note">Ratings are points per hit. Attack: each hit against par for the Town Hall gap (a three-star at the same
+    TH, a high 2-star three up, a 1-star six up); hitting at par is 100 at TH18, and clean-ups 3+ TH down don't count. Defense:
     100 is a TH18 holding against a TH18, more against stronger attackers. Lower Town Halls are easier to three-star, so
     there attacks score less and holds more. The bar runs from the clan's lowest to highest.</p>`);
 }
