@@ -539,7 +539,6 @@ const METRICS = {
   stars: ["Total stars", (s) => s.attacks && s.triples * 3 + s.by_stars[2] * 2 + s.by_stars[1], (v) => `${v} ${star}`, (s) => `${s.attacks} attacks`],
   missed: ["Missed attacks", (s) => s.missed || false, (v) => v, (s) => `${s.wars} wars`],
   hold_rate: ["Defense hold rate", (s, d) => d.attacked >= 3 && d.held / d.attacked, (v) => pct(v), (s, d) => `held ${d.held} of ${d.attacked}`],
-  soe: ["Stars vs expected", (s) => s.attacks >= 3 && s.soe, (v) => (v > 0 ? "+" : "") + v.toFixed(2), (s) => `${s.attacks} attacks · ${s.up} up`],
   donations_total: ["Donations", null, (v) => num(v), null],
   progress: ["Fastest progress", null, (v) => `${v}/week`, null],
   games: ["Clan Games points", null, (v) => num(v), null],
@@ -659,7 +658,6 @@ function warLedger(m, scope) {
     [s.avg_stars.toFixed(2), "avg stars"],
     [`${Math.round(s.avg_destruction)}%`, "avg destruction"],
     [num(s.missed), "missed", s.missed ? "loss" : ""],
-    s.attacks >= 3 && [(s.soe > 0 ? "+" : "") + s.soe.toFixed(2), "stars vs expected", s.soe > 0 ? "win" : s.soe < 0 ? "loss" : ""],
     d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
     d.attacked && [num(d.attacked), "times attacked"],
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
