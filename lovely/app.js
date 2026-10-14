@@ -596,7 +596,7 @@ let warScope = "all";
 // level below 18). A hold scores 100 for a TH18 holding against a TH18, more against stronger attackers and
 // at lower Town Halls, where bases are easier to three-star. Shown against the clan: worst red, best green.
 const MIN_HITS = 3;
-const RANGE_HITS = 5;  // the clan's lowest and highest (bar ends, colours) come from members with this many hits
+const RANGE_HITS = 1;  // the clan's lowest and highest (bar ends, colours) come from members with this many hits
 const RATINGS = {
   attack: ["Attack rating", (s) => s.attack_rating, (s) => s.attacks, "hits"],
   defense: ["Defense rating", (s, d) => d.defense_rating, (s, d) => d.attacked, "times attacked"],
@@ -631,16 +631,15 @@ function ratingParts(which, groups, rating) {
     tip("The rating is the average points per hit, with misses counting 0. Free hits (on a base already three-starred, in regular wars) aren't counted.")}</li></ul>`;
 }
 
-// A rating on the clan's scale: a bar from the clan's lowest to highest (members with 5+ hits), with a
+// A rating on the clan's scale: a bar from the clan's lowest to highest (everyone with hits), with a
 // marker where this member is, and how it adds up.
 function ratingBar(m, scope, which) {
   const [label, value, hits, unit] = RATINGS[which];
   const s = m.war[scope], d = m.defense[scope], v = value(s, d), n = hits(s, d), range = clanRange(scope, which);
   if (!n || typeof v !== "number") return "";  // (data from before the ratings existed: nothing, not a 0)
-  // The bar's ends only count members with RANGE_HITS+ hits, so a few lucky hits can't stretch everyone's scale.
-  const few = n < RANGE_HITS ? ` <span class="muted">· under ${RANGE_HITS} ${unit}, so not on the clan scale yet</span>` : "";
+  const few = n < MIN_HITS ? ` <span class="muted">· few ${unit} yet</span>` : "";
   const bar = range ? `<div class="rating-bar"><span class="rating-mark" style="left:${(place(v, range) * 100).toFixed(1)}%"></span></div>
-    <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)} <span class="muted">(${RANGE_HITS}+ hits)</span></span></div>` : "";
+    <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)}</span></div>` : "";
   return `<div class="rating"><div class="rating-head"><span>${label}</span><b>${toned(v, range, pts(v))}</b>
     <small>${num(n)} ${unit}${few}</small></div>${bar}${ratingParts(which, which === "attack" ? s.breakdown : d.breakdown, v)}</div>`;
 }
@@ -659,8 +658,7 @@ function warLedger(m, scope) {
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
     <p class="note">Ratings are points per hit. 100 is a TH18 three-starring a TH18 (attack) or holding against one (defense).
     Hitting a higher Town Hall, or holding against a stronger attacker, scores more. Lower Town Halls are easier to
-    three-star, so there a three-star scores less and a hold more. The bar runs from the clan's lowest to highest
-    (members with 5+ hits).</p>`);
+    three-star, so there a three-star scores less and a hold more. The bar runs from the clan's lowest to highest.</p>`);
 }
 
 function warStats(m) {
