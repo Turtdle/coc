@@ -532,13 +532,13 @@ function membersPage() {
 }
 
 const METRICS = {
+  attack_rating: ["Attack rating", (s) => s.attacks >= 3 && s.attack_rating, (v) => pts(v), (s) => `${s.attacks} attacks · ${s.up} up`],
+  defense_rating: ["Defense rating", (s, d) => d.attacked >= 3 && d.defense_rating, (v) => pts(v), (s, d) => `held ${d.held} of ${d.attacked}`],
   triple_rate: ["3-star rate", (s) => s.attacks >= 3 && s.triples / s.attacks, (v) => pct(v), (s) => `${s.attacks} attacks`],
   avg_stars: ["Average stars", (s) => s.attacks >= 3 && s.avg_stars, (v) => v.toFixed(2) + " " + star, (s) => `${s.attacks} attacks`],
   stars: ["Total stars", (s) => s.attacks && s.triples * 3 + s.by_stars[2] * 2 + s.by_stars[1], (v) => `${v} ${star}`, (s) => `${s.attacks} attacks`],
   missed: ["Missed attacks", (s) => s.missed || false, (v) => v, (s) => `${s.wars} wars`],
   hold_rate: ["Defense hold rate", (s, d) => d.attacked >= 3 && d.held / d.attacked, (v) => pct(v), (s, d) => `held ${d.held} of ${d.attacked}`],
-  attack_rating: ["Attack rating", (s) => s.attacks >= 3 && s.attack_rating, (v) => pts(v), (s) => `${s.attacks} attacks · ${s.up} up`],
-  defense_rating: ["Defense rating", (s, d) => d.attacked >= 3 && d.defense_rating, (v) => pts(v), (s, d) => `held ${d.held} of ${d.attacked}`],
   soe: ["Stars vs expected", (s) => s.attacks >= 3 && s.soe, (v) => (v > 0 ? "+" : "") + v.toFixed(2), (s) => `${s.attacks} attacks · ${s.up} up`],
   donations_total: ["Donations", null, (v) => num(v), null],
   progress: ["Fastest progress", null, (v) => `${v}/week`, null],
@@ -547,8 +547,8 @@ const METRICS = {
 // Leaderboards that aren't about wars (the war filter doesn't apply).
 const NOT_WARS = new Set(["donations_total", "progress", "games"]);
 
-function leaderboardsPage(metric = "triple_rate", scope = "all") {
-  if (!METRICS[metric]) metric = "triple_rate";
+function leaderboardsPage(metric = "attack_rating", scope = "all") {
+  if (!METRICS[metric]) metric = "attack_rating";
   const [label, value, metricFmt, detail] = METRICS[metric];
   const fmt = metric === "progress" && !weeklyPace() ? (v) => `+${num(v)}` : metricFmt;
   let rows;
