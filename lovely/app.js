@@ -522,11 +522,11 @@ function membersPage() {
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetMark(m) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
     { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="${esc(m.league || "")}" title="${esc(m.league || "")}">` : `<span class="muted" title="Unranked">–</span>`) },
+    { label: "Atk rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks && typeof m.war.all.attack_rating === "number" ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
+    { label: "Def rating", key: (m) => (m.defense.all.attacked ? m.defense.all.defense_rating : -1), html: (m) => (m.defense.all.attacked && typeof m.defense.all.defense_rating === "number" ? toned(m.defense.all.defense_rating, rd, pts(m.defense.all.defense_rating)) : "–"), num: true },
     { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
-    { label: "Atk rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks && typeof m.war.all.attack_rating === "number" ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
     { label: "Held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
-    { label: "Def rating", key: (m) => (m.defense.all.attacked ? m.defense.all.defense_rating : -1), html: (m) => (m.defense.all.attacked && typeof m.defense.all.defense_rating === "number" ? toned(m.defense.all.defense_rating, rd, pts(m.defense.all.defense_rating)) : "–"), num: true },
     { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>${m.cwl.streak ? ` <span class="muted">· ${m.cwl.streak} in a row</span>` : ""}` : `<span class="muted">–</span>`), num: true },
   ], 2);
 }
