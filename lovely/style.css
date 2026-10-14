@@ -23,6 +23,9 @@
   --loss: #a8392f;
   --petal-core: #d9577f; --petal-mid: #f2a9bd; --petal-edge: #fff4f6;
   --vet-bg: #fbe3ea; --vet-edge: #f2bccb;   /* the veteran pill */
+  /* Rating scale, worst to best: the bar (light, cheerful) and coloured numbers (darker, readable on paper). */
+  --bar-lo: #e8877b; --bar-mid: #f2c65f; --bar-hi: #7cbf7a;
+  --tone-lo: #b8412f; --tone-mid: #a8770f; --tone-hi: #3f7f3a;
   --display: "Fraunces", Georgia, "Times New Roman", serif;
   --text: "Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
@@ -33,6 +36,8 @@
   --win: #9cc98a; --loss: #f2867a;
   --petal-core: #e0668c; --petal-mid: #f0a7bc; --petal-edge: #fde7ee;
   --vet-bg: #3a2330; --vet-edge: #6b3a4e;
+  --bar-lo: #c9645a; --bar-mid: #d9ad48; --bar-hi: #5fa25e;
+  --tone-lo: #f2867a; --tone-mid: #f0c060; --tone-hi: #9cc98a;
   color-scheme: dark;
 }
 
@@ -196,11 +201,12 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
 .rating-head span { font: 600 11.5px/1.3 var(--text); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .rating-head b { font: 500 27px/1.15 var(--display); font-variation-settings: "opsz" 72; }
 .rating-head small { color: var(--muted); font-size: 12.5px; }
-.rating-bar { position: relative; height: 8px; margin: 12px 0 5px; border-radius: 999px;
-              background: linear-gradient(to right, color-mix(in srgb, var(--loss) 65%, var(--paper)),
-                                                    color-mix(in srgb, var(--win) 65%, var(--paper))); }
-.rating-mark { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; border-radius: 2px;
-               background: var(--ink); box-shadow: 0 0 0 2px var(--paper); }
+.rating-bar { position: relative; height: 10px; margin: 14px 0 7px; border-radius: 999px;
+              background: linear-gradient(to right, var(--bar-lo), var(--bar-mid) 50%, var(--bar-hi));
+              box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12); }
+.rating-mark { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 50%;
+               transform: translate(-50%, -50%); background: var(--paper); border: 3px solid var(--ink);
+               box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
 .rating-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
 .rating-parts { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
 .rating-parts li { padding: 4px 0; border-bottom: 1px dotted var(--rule); }

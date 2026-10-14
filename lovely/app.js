@@ -608,9 +608,14 @@ function clanRange(scope, which) {
   return vals.length ? { lo: Math.min(...vals), hi: Math.max(...vals) } : null;
 }
 const place = (v, range) => (!range || range.hi <= range.lo ? 0.5 : Math.max(0, Math.min(1, (v - range.lo) / (range.hi - range.lo))));
+// Red to amber to green (never the muddy brown a straight red-green blend goes through).
+function toneColor(p) {
+  return p <= 0.5 ? `color-mix(in srgb, var(--tone-mid) ${Math.round(p * 200)}%, var(--tone-lo))`
+    : `color-mix(in srgb, var(--tone-hi) ${Math.round((p - 0.5) * 200)}%, var(--tone-mid))`;
+}
 function toned(value, range, text) {
   if (!range) return text;
-  return `<span class="toned" style="color:color-mix(in srgb, var(--win) ${Math.round(place(value, range) * 100)}%, var(--loss))">${text}</span>`;
+  return `<span class="toned" style="color:${toneColor(place(value, range))}">${text}</span>`;
 }
 const pts = (v) => num(Math.round(v || 0));
 
