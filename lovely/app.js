@@ -764,6 +764,14 @@ function playerPage(tag, sub) {
       { label: "Date", key: null, html: (a) => `<span class="muted">${when(a.start)}</span>`, num: true },
     ]);
   }
+  if (m.recent_defenses?.length) {  // enemy hits on their base: held (not three-starred) in green
+    html += `<h2>Recent defenses</h2>` + table(m.recent_defenses, [
+      { label: "Result", key: null, html: (d) => `<span class="${d.stars < 3 ? "win" : "loss"}">${stars(d.stars)} <b>${Math.round(d.pct)}%</b> ${d.stars < 3 ? "held" : "three-starred"}</span>${d.free ? ` ${FREE_HIT}` : ""}` },
+      { label: "Attacker", key: null, html: (d) => (d.pos ? `<span class="muted">#${d.pos}</span> ${th(d.th, "small")}` : "?") },
+      { label: "War", key: null, html: (d) => `<span class="muted">${d.kind === "cwl" ? `CWL round ${d.round}` : "War"} vs</span> ${esc(d.opponent)}` },
+      { label: "Date", key: null, html: (d) => `<span class="muted">${when(d.start)}</span>`, num: true },
+    ]);
+  }
   return html;
 }
 
