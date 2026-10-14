@@ -718,7 +718,7 @@ function playerPage(tag, sub) {
   const m = MEMBERS.get(tag);
   if (!m) return `<p class="empty">That player isn't in the clan right now.</p>`;
   const since = m.joined ? ` · in the clan since ${when(m.joined, { month: "short", day: "numeric", year: "numeric" })}` : "";
-  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}${vetMark(m)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${esc(m.league || "Unranked")}${since}</p></div></div>`;
+  let html = `<div class="player-head">${th(m.th)}<div><h2>${esc(m.name)}${vetMark(m)}</h2><p>${ROLES[m.role] || ""} · ${esc(m.tag)} · ${m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="${esc(m.league || "")}" title="${esc(m.league || "")}">` : "Unranked"}${since}</p></div></div>`;
   if (ADMIN) html += leaderBox(tag);
   if (m.donations_total != null) html += givePanel(m);
   if (m.base) {
