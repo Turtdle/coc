@@ -163,8 +163,11 @@ function lineupTable(lineup, pending) {
       html: (m) => (m.attacks.length ? m.attacks.map((a) => `<span class="muted">→ #${a.pos ?? "?"}</span> ${th(a.th, "small")} ${stars(a.stars)} <b class="${a.pct >= 100 ? "gold" : ""}">${Math.round(a.pct)}%</b>${a.free ? ` ${FREE_HIT}` : ""}`).join("<br>") : `<span class="muted">${pending}</span>`),
     },
     {
+      // Every enemy hit on the base, in order: held (not three-starred) in green, three-starred in red.
       label: "Defense", key: (m) => -m.defense.stars,
-      html: (m) => (m.defense.n ? `<span class="${m.defense.stars < 3 ? "win" : "loss"}">${stars(m.defense.stars)} ${Math.round(m.defense.pct)}%</span>${m.defense.n > 1 ? ` <span class="muted">· hit ${m.defense.n}×</span>` : ""}` : `<span class="muted">not attacked</span>`),
+      html: (m) => (m.defense.hits?.length
+        ? m.defense.hits.map((d) => `<span class="muted">← #${d.pos ?? "?"}</span> ${th(d.th, "small")} <span class="${d.stars < 3 ? "win" : "loss"}">${stars(d.stars)} ${Math.round(d.pct)}%</span>${d.free ? ` ${FREE_HIT}` : ""}`).join("<br>")
+        : m.defense.n ? `<span class="${m.defense.stars < 3 ? "win" : "loss"}">${stars(m.defense.stars)} ${Math.round(m.defense.pct)}%</span>${m.defense.n > 1 ? ` <span class="muted">· hit ${m.defense.n}×</span>` : ""}` : `<span class="muted">not attacked</span>`),
     },
   ], 0, 1);  // map position, top first
 }
@@ -185,7 +188,14 @@ function warBody(w) {
       m, s: hits.reduce((t, a) => t + a.stars, 0), d: hits.reduce((t, a) => t + a.pct, 0), x: hits.filter((a) => a.stars === 3).length,
     })).sort((a, b) => b.s - a.s || b.d - a.d).slice(0, 3);
     if (scored.length) html += `<h3>Best attacks</h3>` + names(scored.map(({ m, s, x }) => `${th(m.th, "small")} ${who(m.tag, m.name)} <b>${s}</b>${star}${x > 1 ? ` <span class="muted">${x} triples</span>` : ""}`));
-    if (held.length) html += `<h3>Held (${held.length})</h3>` + names(held.map((m) => `${th(m.th, "small")} ${who(m.tag, m.name)}`));
+    // Every base that held off at least one hit (counted hits only), not just the ones never three-starred.
+    const holds = w.lineup.map((m) => ({ m, hits: (m.defense.hits || []).filter((d) => !d.free) }))
+      .map(({ m, hits }) => ({ m, n: hits.length, held: hits.filter((d) => d.stars < 3).length })).filter((x) => x.held)
+      .sort((a, b) => b.held - a.held || a.m.pos - b.m.pos);
+    if (holds.length) {
+      html += `<h3>Held off hits (${holds.reduce((s, x) => s + x.held, 0)})</h3>` + names(holds.map(({ m, n, held: h }) =>
+        `${th(m.th, "small")} ${who(m.tag, m.name)} <span class="muted">${h} of ${n}${h === n ? ", never three-starred" : ""}</span>`));
+    } else if (held.length) html += `<h3>Held (${held.length})</h3>` + names(held.map((m) => `${th(m.th, "small")} ${who(m.tag, m.name)}`));
   }
   if (left.length) {
     const label = live ? "Still to attack" : "Didn't attack";
@@ -503,15 +513,20 @@ function streaksPage(order) {
 
 function membersPage() {
   const rows = DATA.members.map((m) => ({ ...m, cwl: cwlRecord(m.tag) }));
+  const ra = clanRange("all", "attack"), rd = clanRange("all", "defense");
   return `<h2>${num(DATA.members.length)} members</h2>
-    <p class="note">Donations are everything given since the bot started counting, so they don't reset each season.</p>` + table(rows, [
+    <p class="note">Donations are everything given since the bot started counting, so they don't reset each season.
+    Ratings are points per hit, weighed by the Town Hall gap and level (see a member's page); they're coloured from the
+    clan's lowest (red) to highest (green).</p>` + table(rows, [
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetMark(m) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
     { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
     { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
+    { label: "Attack rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
     { label: "Defense held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
+    { label: "Defense rating", key: (m) => (m.defense.all.attacked ? m.defense.all.defense_rating : -1), html: (m) => (m.defense.all.attacked ? toned(m.defense.all.defense_rating, rd, pts(m.defense.all.defense_rating)) : "–"), num: true },
     { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>` : `<span class="muted">–</span>`), num: true },
     { label: "In a row", key: (m) => m.cwl.streak, html: (m) => (m.cwl.streak ? m.cwl.streak : `<span class="muted">–</span>`), num: true },
   ], 2);
@@ -523,6 +538,8 @@ const METRICS = {
   stars: ["Total stars", (s) => s.attacks && s.triples * 3 + s.by_stars[2] * 2 + s.by_stars[1], (v) => `${v} ${star}`, (s) => `${s.attacks} attacks`],
   missed: ["Missed attacks", (s) => s.missed || false, (v) => v, (s) => `${s.wars} wars`],
   hold_rate: ["Defense hold rate", (s, d) => d.attacked >= 3 && d.held / d.attacked, (v) => pct(v), (s, d) => `held ${d.held} of ${d.attacked}`],
+  attack_rating: ["Attack rating", (s) => s.attacks >= 3 && s.attack_rating, (v) => pts(v), (s) => `${s.attacks} attacks · ${s.up} up`],
+  defense_rating: ["Defense rating", (s, d) => d.attacked >= 3 && d.defense_rating, (v) => pts(v), (s, d) => `held ${d.held} of ${d.attacked}`],
   soe: ["Stars vs expected", (s) => s.attacks >= 3 && s.soe, (v) => (v > 0 ? "+" : "") + v.toFixed(2), (s) => `${s.attacks} attacks · ${s.up} up`],
   donations_total: ["Donations", null, (v) => num(v), null],
   progress: ["Fastest progress", null, (v) => `${v}/week`, null],
@@ -549,7 +566,7 @@ function leaderboardsPage(metric = "triple_rate", scope = "all") {
     document.getElementById("scope").onchange = go;
   });
   return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${NOT_WARS.has(metric) ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
-    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, fmt(v), d]))}
+    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, metric.endsWith("_rating") ? toned(v, { lo: rows[rows.length - 1][1], hi: rows[0][1] }, fmt(v)) : fmt(v), d]))}
     <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
@@ -575,6 +592,41 @@ function givePanel(m) {
 const WAR_SCOPES = [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wars"]];
 let warScope = "all";
 
+// Attack and defence ratings (wars.py ratings): points per hit. A three-star scores 100 for TH18 on TH18,
+// more hitting up (one TH 1.5x, two 2x, three 4x), less hitting down or at lower Town Halls (10% less per
+// level below 18). A hold scores 100 for a TH18 holding against a TH18, more against stronger attackers and
+// at lower Town Halls, where bases are easier to three-star. Shown against the clan: worst red, best green.
+const MIN_HITS = 3;
+const RATINGS = {
+  attack: ["Attack rating", (s) => s.attack_rating, (s) => s.attacks, "hits"],
+  defense: ["Defense rating", (s, d) => d.defense_rating, (s, d) => d.attacked, "times attacked"],
+};
+function clanRange(scope, which) {
+  const [, value, hits] = RATINGS[which];
+  const vals = DATA.members.filter((m) => hits(m.war[scope], m.defense[scope]) >= MIN_HITS)
+    .map((m) => value(m.war[scope], m.defense[scope]));
+  return vals.length ? { lo: Math.min(...vals), hi: Math.max(...vals) } : null;
+}
+const place = (v, range) => (!range || range.hi <= range.lo ? 0.5 : Math.max(0, Math.min(1, (v - range.lo) / (range.hi - range.lo))));
+function toned(value, range, text) {
+  if (!range) return text;
+  return `<span class="toned" style="color:color-mix(in srgb, var(--win) ${Math.round(place(value, range) * 100)}%, var(--loss))">${text}</span>`;
+}
+const pts = (v) => num(Math.round(v || 0));
+
+// A rating on the clan's scale: a bar from the clan's lowest to highest (members with 3+ hits), with a
+// marker where this member is.
+function ratingBar(m, scope, which) {
+  const [label, value, hits, unit] = RATINGS[which];
+  const s = m.war[scope], d = m.defense[scope], v = value(s, d), n = hits(s, d), range = clanRange(scope, which);
+  if (!n) return "";
+  const few = n < MIN_HITS ? ` <span class="muted">· few ${unit} yet</span>` : "";
+  const bar = range ? `<div class="rating-bar"><span class="rating-mark" style="left:${(place(v, range) * 100).toFixed(1)}%"></span></div>
+    <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)}</span></div>` : "";
+  return `<div class="rating"><div class="rating-head"><span>${label}</span><b>${toned(v, range, pts(v))}</b>
+    <small>${num(n)} ${unit}${few}</small></div>${bar}</div>`;
+}
+
 function warLedger(m, scope) {
   const s = m.war[scope], d = m.defense[scope];
   return ledger([
@@ -586,7 +638,11 @@ function warLedger(m, scope) {
     s.attacks >= 3 && [(s.soe > 0 ? "+" : "") + s.soe.toFixed(2), "stars vs expected", s.soe > 0 ? "win" : s.soe < 0 ? "loss" : ""],
     d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
     d.attacked && [num(d.attacked), "times attacked"],
-  ]);
+  ]) + `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
+    <p class="note">Ratings are points per hit. A three-star at TH18 on TH18 is 100; hitting up counts more (one TH up 1.5x,
+    two up 2x, three up 4x), and lower Town Halls count 10% less per level, since they're easier to three-star. A hold at
+    TH18 against a TH18 is 100; holding against stronger attackers, or at lower Town Halls, counts more.
+    The bar runs from the clan's lowest to highest (members with 3+ hits).</p>`;
 }
 
 function warStats(m) {
