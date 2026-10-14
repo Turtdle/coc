@@ -521,14 +521,13 @@ function membersPage() {
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetMark(m) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
-    { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="">` : "") + `<span class="muted">${esc(m.league || "Unranked")}</span>` },
+    { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="${esc(m.league || "")}" title="${esc(m.league || "")}">` : `<span class="muted" title="Unranked">–</span>`) },
     { label: "Donated", key: (m) => m.donations_total ?? -1, html: (m) => (m.donations_total == null ? `<span class="muted">–</span>` : `<b>${num(m.donations_total)}</b>`), num: true },
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
-    { label: "Attack rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks && typeof m.war.all.attack_rating === "number" ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
-    { label: "Defense held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
-    { label: "Defense rating", key: (m) => (m.defense.all.attacked ? m.defense.all.defense_rating : -1), html: (m) => (m.defense.all.attacked && typeof m.defense.all.defense_rating === "number" ? toned(m.defense.all.defense_rating, rd, pts(m.defense.all.defense_rating)) : "–"), num: true },
-    { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>` : `<span class="muted">–</span>`), num: true },
-    { label: "In a row", key: (m) => m.cwl.streak, html: (m) => (m.cwl.streak ? m.cwl.streak : `<span class="muted">–</span>`), num: true },
+    { label: "Atk rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks && typeof m.war.all.attack_rating === "number" ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
+    { label: "Held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
+    { label: "Def rating", key: (m) => (m.defense.all.attacked ? m.defense.all.defense_rating : -1), html: (m) => (m.defense.all.attacked && typeof m.defense.all.defense_rating === "number" ? toned(m.defense.all.defense_rating, rd, pts(m.defense.all.defense_rating)) : "–"), num: true },
+    { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>${m.cwl.streak ? ` <span class="muted">· ${m.cwl.streak} in a row</span>` : ""}` : `<span class="muted">–</span>`), num: true },
   ], 2);
 }
 
@@ -593,17 +592,18 @@ const WAR_SCOPES = [["all", "All wars"], ["cwl", "CWL"], ["regular", "Regular wa
 let warScope = "all";
 
 // Attack and defence ratings (wars.py ratings): points per hit. A three-star scores 100 for TH18 on TH18,
-// more hitting up (one TH 1.5x, two 2x, three 4x), less hitting down or at lower Town Halls (10% less per
+// more hitting up (one TH 1.2x, two 1.4x, three 1.7x), less hitting down or at lower Town Halls (10% less per
 // level below 18). A hold scores 100 for a TH18 holding against a TH18, more against stronger attackers and
 // at lower Town Halls, where bases are easier to three-star. Shown against the clan: worst red, best green.
 const MIN_HITS = 3;
+const RANGE_HITS = 5;  // the clan's lowest and highest (bar ends, colours) come from members with this many hits
 const RATINGS = {
   attack: ["Attack rating", (s) => s.attack_rating, (s) => s.attacks, "hits"],
   defense: ["Defense rating", (s, d) => d.defense_rating, (s, d) => d.attacked, "times attacked"],
 };
 function clanRange(scope, which) {
   const [, value, hits] = RATINGS[which];
-  const vals = DATA.members.filter((m) => hits(m.war[scope], m.defense[scope]) >= MIN_HITS)
+  const vals = DATA.members.filter((m) => hits(m.war[scope], m.defense[scope]) >= RANGE_HITS)
     .map((m) => value(m.war[scope], m.defense[scope])).filter((v) => typeof v === "number");
   return vals.length ? { lo: Math.min(...vals), hi: Math.max(...vals) } : null;
 }
@@ -641,7 +641,8 @@ function warLedger(m, scope) {
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
     <p class="note">Ratings are points per hit. 100 is a TH18 three-starring a TH18 (attack) or holding against one (defense).
     Hitting a higher Town Hall, or holding against a stronger attacker, scores more. Lower Town Halls are easier to
-    three-star, so there a three-star scores less and a hold more. The bar runs from the clan's lowest to highest.</p>`);
+    three-star, so there a three-star scores less and a hold more. The bar runs from the clan's lowest to highest
+    (members with 5+ hits).</p>`);
 }
 
 function warStats(m) {
