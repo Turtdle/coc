@@ -737,6 +737,15 @@ function upgradesPage(tag) {
   return html;
 }
 
+// What went up, item by item (bot/snapshots.py upgrades): "Barbarian King 95 → 96". Levels from before
+// troops and spells were itemized (2026-10-15) show as one count.
+function progressItems(p) {
+  if (!p || (!p.upgrades?.length && !p.not_itemized)) return "";
+  const items = (p.upgrades || []).map((u) => `<li><span>${esc(u.name)}</span> <span class="muted">${u.from ? u.from : "new"} → </span><b>${u.to}</b></li>`);
+  if (p.not_itemized) items.push(`<li class="muted">+${num(p.not_itemized)} earlier troop or spell level${p.not_itemized === 1 ? "" : "s"}, from before levels were tracked item by item</li>`);
+  return `<ul class="upgrade-list">${items.join("")}</ul>`;
+}
+
 function playerPage(tag, sub) {
   if (sub === "upgrades") return upgradesPage(tag);
   const m = MEMBERS.get(tag);
@@ -760,7 +769,7 @@ function playerPage(tag, sub) {
       m.progress && m.progress.days >= 7 && [`${m.progress.per_week}`, "a week at this pace"],
       m.progress && m.progress.th_to > m.progress.th_from && [`TH${m.progress.th_from} → ${m.progress.th_to}`, "town hall"],
       m.games && [num(m.games.points), `Clan Games points${m.games.ongoing ? " so far" : ""}`],
-    ]) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine and pet level they upgrade counts as one (hero equipment isn't counted for now),
+    ]) + progressItems(m.progress) + (m.progress ? `<p class="note">Every hero, troop, spell, siege machine and pet level they upgrade counts as one (hero equipment isn't counted for now),
       from a daily check of their profile. Buildings and walls aren't counted: the game doesn't share them.</p>` : "");
   }
   html += warStats(m);
