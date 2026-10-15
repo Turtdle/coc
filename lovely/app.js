@@ -154,13 +154,22 @@ function scoreboard(w, href = null) {
     : `<div class="scoreboard">${inner}</div>`;
 }
 
+// How an attack did against par for its Town Hall gap, in attack-rating points (wars.py vs_par): green
+// above, red below. Nothing for free hits and clean-ups, which the rating doesn't count.
+function parBadge(v) {
+  if (typeof v !== "number") return "";
+  const cls = v > 0 ? "up" : v < 0 ? "down" : "even";
+  const text = v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "±0";
+  return ` <span class="par ${cls}" title="Against par for this Town Hall gap, in attack-rating points">${text}</span>`;
+}
+
 function lineupTable(lineup, pending) {
   return table(lineup, [
     { label: "#", key: (m) => m.pos, html: (m) => `<span class="muted">${m.pos}</span>` },
     { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th)} ${who(m.tag, m.name)}` },
     {
       label: "Attacks", key: (m) => m.attacks.reduce((s, a) => s + a.stars, 0),
-      html: (m) => (m.attacks.length ? m.attacks.map((a) => `<span class="muted">→ #${a.pos ?? "?"}</span> ${th(a.th, "small")} ${stars(a.stars)} <b class="${a.pct >= 100 ? "gold" : ""}">${Math.round(a.pct)}%</b>${a.free ? ` ${FREE_HIT}` : ""}`).join("<br>") : `<span class="muted">${pending}</span>`),
+      html: (m) => (m.attacks.length ? m.attacks.map((a) => `<span class="muted">→ #${a.pos ?? "?"}</span> ${th(a.th, "small")} ${stars(a.stars)} <b class="${a.pct >= 100 ? "gold" : ""}">${Math.round(a.pct)}%</b>${parBadge(a.vs_par)}${a.free ? ` ${FREE_HIT}` : ""}`).join("<br>") : `<span class="muted">${pending}</span>`),
     },
     {
       // Every enemy hit on the base, in order: held (not three-starred) in green, three-starred in red.
