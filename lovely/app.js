@@ -651,7 +651,7 @@ function ratingParts(which, groups, rating) {
       tip("Hitting 3 or more Town Halls down is cleaning up a bottom base: it doesn't count for or against the attack rating.")}</li>`
     : which === "attack"
     ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.by_stars ? results(g) : `${g.hits} hit${g.hits === 1 ? "" : "s"}`}. <span class="muted">Par: ${par(g.gap)}.</span> → <b>${n1(g.points)}</b> pts${
-      tip(`Hitting at par scores 100 points (on a TH18; 10% less per level below). The maths: each hit's result is its stars plus destruction ÷ 100 (a three-star is 4.0, a 2-star at 95% is 2.95), and par here (${par(g.gap)}) is ${g.expected.toFixed(1)}. Points = result ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (TH${g.def_th} level)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}. These ${g.hits} hits averaged ${(g.score / g.hits).toFixed(2)}, so ${n1(g.points / g.hits)} each.`)}</li>`
+      tip(`Hitting at par scores 100 points (on a TH18; 10% less per level below). The maths: each hit's result is its stars plus destruction ÷ 100 (a three-star is 4.0, a 2-star at 95% is 2.95), and par here (${par(g.gap)}) is ${g.expected.toFixed(1)}. Points = result ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (TH${g.def_th} level)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}.${g.above ? ` ${g.above === g.hits ? (g.hits === 1 ? "It was" : "All were") : `${g.above} of them were`} above your mirror in a regular war: points over par count 1.5×, points under par only half.` : ""} These ${g.hits} hits averaged ${(g.score / g.hits).toFixed(2)}, so ${n1(g.points / g.hits)} each.`)}</li>`
     : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
       tip(`One hold here: 100 × ${g.gap_weight} (attacker ${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base: holds count more at lower Town Halls, at most 3x) = ${n1(g.each)} points. Three-starred hits score 0.`)}</li>`);
   return `<ul class="rating-parts">${lines.join("")}<li class="sum">${n1(total)} points ÷ ${hits} ${which === "attack" ? "hits" : "times attacked"} = <b>${pts(rating)}</b>${
@@ -684,7 +684,8 @@ function warLedger(m, scope) {
     d.attacked && [num(d.attacked), "times attacked"],
   ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
     <p class="note">Ratings are points per hit. Attack: each hit against par for the Town Hall gap (a three-star at the same
-    TH, a high 2-star three up, a 1-star six up); hitting at par is 100 at TH18, and clean-ups 3+ TH down don't count. Defense:
+    TH, a high 2-star three up, a 1-star six up); hitting at par is 100 at TH18, and clean-ups 3+ TH down don't count. In regular
+    wars, a hit above your mirror counts what it beats par by 1.5× and what it misses by only half. Defense:
     100 is a TH18 holding against a TH18, more against stronger attackers. Lower Town Halls are easier to three-star, so
     there attacks score less and holds more. The bar runs from the clan's lowest to highest.</p>`);
 }
