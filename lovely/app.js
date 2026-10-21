@@ -612,8 +612,9 @@ function cwlReadiness(m) {
     r.form != null && [`${r.form > 0 ? "+" : ""}${n1(r.form)}`, `form: last ${R.form_hits} vs the ${R.form_hits} before`, r.form > 0 ? "win" : r.form < 0 ? "loss" : ""],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
   ]) + `<p class="note">${why}</p>`;
+  let workings = "";
   if (r.hits?.length) {
-    html += table(r.hits, [
+    workings += table(r.hits, [
       { label: "Hit", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b>` },
       { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18s${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
       { label: "Result", key: null, html: (h) => `${h.result}%`, num: true },
@@ -623,11 +624,11 @@ function cwlReadiness(m) {
       { label: "Date", key: null, html: (h) => `<span class="muted">${when(h.when)}</span>`, num: true },
     ]);
   }
-  return html + `<p class="note">Every CWL opponent is a TH18 now, so this rates hits on TH18s (in the last ${R.window_days} days, CWL and regular wars;
+  return html + calc("cwl", workings + `<p class="note">Every CWL opponent is a TH18 now, so this rates hits on TH18s (in the last ${R.window_days} days, CWL and regular wars;
     free hits don't count). Each hit scores its result × the base's height. The result is stars plus destruction, out of 4 (a three-star is 100%,
     2 stars at 95% is 74%). The height is where the base sat among that war's TH18s: 100% for their top one down to ${R.bottom ?? 80}% for their bottom one,
     so #2 of 4 and #4 of 8 count about the same. Readiness is the average of the last ${R.recent_hits} hits. Eligible: ${R.threshold}+ from at
-    least ${R.min_hits} hits, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`;
+    least ${R.min_hits} hits, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`);
 }
 
 // Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.
@@ -712,7 +713,7 @@ function ratingParts(which, groups, rating) {
 }
 
 // A rating on the clan's scale: a bar from the clan's lowest to highest (everyone with hits), with a
-// marker where this member is, and how it adds up.
+// marker where this member is. How it adds up is in ratingCalc, behind "Show calculations".
 function ratingBar(m, scope, which) {
   const [label, value, hits, unit] = RATINGS[which];
   const s = m.war[scope], d = m.defense[scope], v = value(s, d), n = hits(s, d), range = clanRange(scope, which);
@@ -721,7 +722,22 @@ function ratingBar(m, scope, which) {
   const bar = range ? `<div class="rating-bar"><span class="rating-mark" style="left:${(place(v, range) * 100).toFixed(1)}%"></span></div>
     <div class="rating-ends"><span>${pts(range.lo)} lowest</span><span>highest ${pts(range.hi)}</span></div>` : "";
   return `<div class="rating"><div class="rating-head"><span>${label}</span><b>${toned(v, range, pts(v))}</b>
-    <small>${num(n)} ${unit}${few}</small></div>${bar}${ratingParts(which, which === "attack" ? s.breakdown : d.breakdown, v)}</div>`;
+    <small>${num(n)} ${unit}${few}</small></div>${bar}</div>`;
+}
+function ratingCalc(m, scope, which) {
+  const [label, value, hits] = RATINGS[which];
+  const s = m.war[scope], d = m.defense[scope], v = value(s, d);
+  if (!hits(s, d) || typeof v !== "number") return "";
+  return `<div><h3>${label}</h3>${ratingParts(which, which === "attack" ? s.breakdown : d.breakdown, v)}</div>`;
+}
+
+// "Show calculations": the workings behind a number, folded away until asked for. Stays open or shut
+// while moving between members and war tabs.
+const calcOpen = {};
+function calc(key, body) {
+  setTimeout(() => document.querySelectorAll(`details.calc[data-key="${key}"]`).forEach((el) =>
+    el.addEventListener("toggle", () => { calcOpen[key] = el.open; })));
+  return `<details class="calc" data-key="${key}"${calcOpen[key] ? " open" : ""}><summary>Show calculations</summary>${body}</details>`;
 }
 
 function warLedger(m, scope) {
@@ -734,12 +750,13 @@ function warLedger(m, scope) {
     [num(s.missed), "missed", s.missed ? "loss" : ""],
     d.attacked && [pct(d.held / d.attacked), "defenses held", d.held * 2 >= d.attacked ? "win" : "loss"],
     d.attacked && [num(d.attacked), "times attacked"],
-  ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>
+  ]) + (s.attack_rating === undefined ? "" : `<div class="ratings">${ratingBar(m, scope, "attack")}${ratingBar(m, scope, "defense")}</div>`
+    + calc("ratings", `<div class="ratings">${ratingCalc(m, scope, "attack")}${ratingCalc(m, scope, "defense")}</div>
     <p class="note">Ratings are points per hit. Attack: each hit against par for the Town Hall gap (a three-star at the same
     TH, a high 2-star three up, a 1-star six up); hitting at par is 100 at TH18, and clean-ups 3+ TH down don't count. In regular
     wars, a hit above your mirror counts what it beats par by 1.5× and what it misses by only half. Defense:
     100 is a TH18 holding against a TH18, more against stronger attackers. Lower Town Halls are easier to three-star, so
-    there attacks score less and holds more. The bar runs from the clan's lowest to highest.</p>`);
+    there attacks score less and holds more. The bar runs from the clan's lowest to highest.</p>`));
 }
 
 function warStats(m) {
