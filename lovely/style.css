@@ -180,7 +180,7 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
 /* Results as words, not badges. */
 .res { font: italic 400 16px/1 var(--display); }
 .res.W { color: var(--win); } .res.L { color: var(--loss); } .res.T { color: var(--muted); }
-.res.inWar { color: var(--accent); } .res.preparation { color: var(--muted); }
+.res.inWar { color: var(--accent); } .res.preparation { color: var(--tone-mid); }  /* prep: amber, apart from a tie's grey */
 .role { font-size: 14px; }
 .role.leader { color: var(--accent); font-weight: 600; }
 .role.coLeader { font-weight: 600; }
