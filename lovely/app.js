@@ -779,8 +779,8 @@ function warStats(m) {
 
 // A leader's mark of honour (veterans.py): "Veteran", or "Veteran · <title>", next to the name.
 const vetMark = (m) => (m.veteran ? ` <span class="vet">${esc(m.veteran)}</span>` : "");
-// The quiet version for the Members table: a small blossom, the mark itself on hover.
-const vetDot = (m) => (m.veteran ? ` <span class="vet-dot" title="${esc(m.veteran)}" aria-label="${esc(m.veteran)}" role="img">✿</span>` : "");
+// The quiet version for the Members table: a small blossom, the mark itself on hover (or tap).
+const vetDot = (m) => (m.veteran ? ` <span class="vet-dot" tabindex="0" role="img" aria-label="${esc(m.veteran)}" data-tip="${esc(m.veteran)}">✿</span>` : "");
 
 // What changed in a member's village since the reader's previous visit (reader/compare.py): boxes drawn
 // over the screenshot, and one line naming the buildings. Patches the model couldn't name as an upgrade
