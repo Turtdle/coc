@@ -627,7 +627,7 @@ function cwlReadiness(m) {
     free hits don't count). Each hit scores its result × the base's height. The result is stars plus destruction, out of 4 (a three-star is 100%,
     2 stars at 95% is 74%). The height is where the base sat among that war's TH18s: 100% for their top one down to 50% for their bottom one,
     so #2 of 4 and #4 of 8 count about the same. Readiness is the average of the last ${R.recent_hits} hits. Eligible: ${R.threshold}+ from at
-    least ${R.min_hits} hits, war preference in, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`;
+    least ${R.min_hits} hits, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`;
 }
 
 // Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.
