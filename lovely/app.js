@@ -521,15 +521,9 @@ function streaksPage(order) {
 }
 
 // CWL readiness and eligibility (cwl_ready.py): how well a member hits TH18s, and whether that earns a CWL
-// spot. A leaders' call (override) wins over the worked-out status.
-const CWL_STATUS = { eligible: ["Eligible", "win", 4], not_yet: ["Not yet", "gold", 3], trial: ["Trial", "muted", 2],
-  out: ["Out", "loss", 1], not_eligible: ["Not eligible", "loss", 1] };
-const cwlChip = (r) => {
-  const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
-  return `<span class="cwl-st ${cls}"${r.override ? ` title="A leaders' call"` : ""}>${label}${r.override ? "*" : ""}</span>`;
-};
-const cwlCell = (r) => (r ? `${cwlChip(r)}${r.rating == null ? "" : ` <b title="${r.count} TH18 hit${r.count === 1 ? "" : "s"}">${pts(r.rating)}</b>`}` : `<span class="muted">–</span>`);
-const cwlSort = (r) => (r ? (CWL_STATUS[r.status]?.[2] || 0) * 1000 + (r.rating ?? -1) : -1);
+// spot. A leaders' call (override) wins over the worked-out status. Shown on member pages only.
+const CWL_STATUS = { eligible: ["Eligible", "win"], not_yet: ["Not yet", "gold"], trial: ["Trial", "muted"],
+  out: ["Out", "loss"], not_eligible: ["Not eligible", "loss"] };
 
 function membersPage() {
   const rows = DATA.members.map((m) => ({ ...m, cwl: cwlRecord(m.tag) }));
@@ -548,7 +542,6 @@ function membersPage() {
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
     { label: "Held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
     { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>${m.cwl.streak ? ` <span class="muted">· ${m.cwl.streak} in a row</span>` : ""}` : `<span class="muted">–</span>`), num: true },
-    { label: "CWL", key: (m) => cwlSort(m.cwl_ready), html: (m) => cwlCell(m.cwl_ready), num: true },
   ], 2);
 }
 
@@ -563,10 +556,9 @@ const METRICS = {
   donations_total: ["Donations", null, (v) => num(v), null],
   progress: ["Fastest progress", null, (v) => `${v}/week`, null],
   games: ["Clan Games points", null, (v) => num(v), null],
-  cwl_ready: ["CWL readiness", null, (v) => pts(v), null],
 };
 // Leaderboards that aren't about wars (the war filter doesn't apply).
-const NOT_WARS = new Set(["donations_total", "progress", "games", "cwl_ready"]);
+const NOT_WARS = new Set(["donations_total", "progress", "games"]);
 
 function leaderboardsPage(metric = "attack_rating", scope = "all") {
   if (!METRICS[metric]) metric = "attack_rating";
@@ -577,8 +569,6 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
   else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => (weeklyPace()
     ? [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`] : [m, m.progress.gained, `levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]));
   else if (metric === "games") rows = DATA.members.filter((m) => m.games).map((m) => [m, m.games.points, m.games.ongoing ? "still going" : `${m.games.start.slice(5)} to ${m.games.end.slice(5)}`]);
-  else if (metric === "cwl_ready") rows = DATA.members.filter((m) => m.cwl_ready?.rating != null).map((m) => [m, m.cwl_ready.rating,
-    `${m.cwl_ready.count} TH18 hit${m.cwl_ready.count === 1 ? "" : "s"} · ${(CWL_STATUS[m.cwl_ready.status] || ["–"])[0].toLowerCase()}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
   const opts = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("");
@@ -588,7 +578,7 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
     document.getElementById("scope").onchange = go;
   });
   return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${NOT_WARS.has(metric) ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
-    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, metric.endsWith("_rating") || metric === "cwl_ready" ? toned(v, { lo: rows[rows.length - 1][1], hi: rows[0][1] }, fmt(v)) : fmt(v), d]))}
+    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, metric.endsWith("_rating") ? toned(v, { lo: rows[rows.length - 1][1], hi: rows[0][1] }, fmt(v)) : fmt(v), d]))}
     <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
