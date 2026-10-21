@@ -520,6 +520,17 @@ function streaksPage(order) {
   return html;
 }
 
+// CWL readiness and eligibility (cwl_ready.py): how well a member hits TH18s, and whether that earns a CWL
+// spot. A leaders' call (override) wins over the worked-out status.
+const CWL_STATUS = { eligible: ["Eligible", "win", 4], not_yet: ["Not yet", "gold", 3], trial: ["Trial", "muted", 2],
+  out: ["Out", "loss", 1], not_eligible: ["Not eligible", "loss", 1] };
+const cwlChip = (r) => {
+  const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
+  return `<span class="cwl-st ${cls}"${r.override ? ` title="A leaders' call"` : ""}>${label}${r.override ? "*" : ""}</span>`;
+};
+const cwlCell = (r) => (r ? `${cwlChip(r)}${r.rating == null ? "" : ` <b title="${r.count} TH18 hit${r.count === 1 ? "" : "s"}">${pts(r.rating)}</b>`}` : `<span class="muted">–</span>`);
+const cwlSort = (r) => (r ? (CWL_STATUS[r.status]?.[2] || 0) * 1000 + (r.rating ?? -1) : -1);
+
 function membersPage() {
   const rows = DATA.members.map((m) => ({ ...m, cwl: cwlRecord(m.tag) }));
   const ra = clanRange("all", "attack"), rd = clanRange("all", "defense");
@@ -537,6 +548,7 @@ function membersPage() {
     { label: "3★ rate", key: (m) => (m.war.all.attacks ? m.war.all.triples / m.war.all.attacks : -1), html: (m) => (m.war.all.attacks ? pct(m.war.all.triples / m.war.all.attacks) : "–"), num: true },
     { label: "Held", key: (m) => (m.defense.all.attacked ? m.defense.all.held / m.defense.all.attacked : -1), html: (m) => (m.defense.all.attacked ? pct(m.defense.all.held / m.defense.all.attacked) : "–"), num: true },
     { label: "Perfect CWLs", key: (m) => m.cwl.perfect * 100 + m.cwl.streak, html: (m) => (m.cwl.perfect ? `<span class="perfect-n">${m.cwl.perfect}</span>${m.cwl.streak ? ` <span class="muted">· ${m.cwl.streak} in a row</span>` : ""}` : `<span class="muted">–</span>`), num: true },
+    { label: "CWL", key: (m) => cwlSort(m.cwl_ready), html: (m) => cwlCell(m.cwl_ready), num: true },
   ], 2);
 }
 
@@ -551,9 +563,10 @@ const METRICS = {
   donations_total: ["Donations", null, (v) => num(v), null],
   progress: ["Fastest progress", null, (v) => `${v}/week`, null],
   games: ["Clan Games points", null, (v) => num(v), null],
+  cwl_ready: ["CWL readiness", null, (v) => pts(v), null],
 };
 // Leaderboards that aren't about wars (the war filter doesn't apply).
-const NOT_WARS = new Set(["donations_total", "progress", "games"]);
+const NOT_WARS = new Set(["donations_total", "progress", "games", "cwl_ready"]);
 
 function leaderboardsPage(metric = "attack_rating", scope = "all") {
   if (!METRICS[metric]) metric = "attack_rating";
@@ -564,6 +577,8 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
   else if (metric === "progress") rows = DATA.members.filter((m) => m.progress).map((m) => (weeklyPace()
     ? [m, m.progress.per_week, `+${m.progress.gained} levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`] : [m, m.progress.gained, `levels in ${m.progress.days} day${m.progress.days === 1 ? "" : "s"}`]));
   else if (metric === "games") rows = DATA.members.filter((m) => m.games).map((m) => [m, m.games.points, m.games.ongoing ? "still going" : `${m.games.start.slice(5)} to ${m.games.end.slice(5)}`]);
+  else if (metric === "cwl_ready") rows = DATA.members.filter((m) => m.cwl_ready?.rating != null).map((m) => [m, m.cwl_ready.rating,
+    `${m.cwl_ready.count} TH18 hit${m.cwl_ready.count === 1 ? "" : "s"} · ${(CWL_STATUS[m.cwl_ready.status] || ["–"])[0].toLowerCase()}`]);
   else rows = DATA.members.map((m) => [m, value(m.war[scope], m.defense[scope]), detail(m.war[scope], m.defense[scope])]).filter((r) => r[1] !== false && r[1] !== 0);
   rows.sort((a, b) => b[1] - a[1]);
   const opts = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("");
@@ -573,9 +588,55 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
     document.getElementById("scope").onchange = go;
   });
   return `<div class="controls"><select id="metric" aria-label="Stat">${opts(METRICS, metric)}</select><select id="scope" aria-label="Wars" ${NOT_WARS.has(metric) ? "disabled" : ""}>${opts({ all: "All wars", cwl: "CWL", regular: "Regular wars" }, scope)}</select></div>
-    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, metric.endsWith("_rating") ? toned(v, { lo: rows[rows.length - 1][1], hi: rows[0][1] }, fmt(v)) : fmt(v), d]))}
+    <h2>${esc(label)}</h2>${rankList(rows.slice(0, 25).map(([m, v, d]) => [m, metric.endsWith("_rating") || metric === "cwl_ready" ? toned(v, { lo: rows[rows.length - 1][1], hi: rows[0][1] }, fmt(v)) : fmt(v), d]))}
     <p class="note">Rates and averages need at least 3 attacks (or defenses). War stats come from wars the bot has recorded.
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
+}
+
+// A member's CWL readiness: their status, what it's made of, what's left to earn a spot, and the TH18 hits.
+function cwlReadiness(m) {
+  const r = m.cwl_ready, R = DATA.cwl_rules;
+  if (!r || !R) return "";
+  const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const range = { lo: 40, hi: 100 };
+  let why;
+  if (r.override) {
+    why = `A leaders' call: <b>${label.toLowerCase()}</b>. By the numbers they'd be ${(CWL_STATUS[r.computed] || ["–"])[0].toLowerCase()}${r.computed === "out" && r.out_reason ? ` (${esc(r.out_reason)})` : ""}.`;
+  } else if (r.status === "out") {
+    why = `Out for now: ${esc(r.out_reason || "")}.`;
+  } else if (r.status === "eligible") {
+    why = `Readiness ${pts(r.rating)} from ${plural(r.count, "TH18 hit")}: eligible (${R.threshold}+ from at least ${R.min_hits}).`;
+  } else if (r.status === "not_yet") {
+    why = `Readiness ${pts(r.rating)}: ${pts(Math.max(1, R.threshold - r.rating))} short of ${R.threshold}. Higher bases and cleaner hits raise it; it's the average of the last ${R.recent_hits} TH18 hits.`;
+  } else if (!r.count) {
+    why = `No TH18 hits yet in the last ${R.window_days} days. ${R.min_hits} hits on TH18s averaging ${R.threshold} or more earn a CWL spot; regular wars count.`;
+  } else {
+    why = `${r.count} of ${R.min_hits} TH18 hits so far, averaging ${pts(r.rating)}. ${plural(R.min_hits - r.count, "more hit")} on TH18s, with the average at ${R.threshold}+, earn a CWL spot; regular wars count.`;
+  }
+  if (r.heroes_vs != null) why += ` Heroes: ${r.heroes_vs >= 0 ? `${r.heroes_vs}% above` : `${-r.heroes_vs}% below`} the eligible members' median.`;
+  let html = `<h2>CWL readiness</h2>` + ledger([
+    [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
+    [r.rating == null ? "–" : toned(r.rating, range, pts(r.rating)), "readiness"],
+    [num(r.count), `TH18 hits, ${R.window_days} days`],
+    r.form != null && [`${r.form > 0 ? "+" : ""}${n1(r.form)}`, `form: last ${R.form_hits} vs the ${R.form_hits} before`, r.form > 0 ? "win" : r.form < 0 ? "loss" : ""],
+    r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
+  ]) + `<p class="note">${why}</p>`;
+  if (r.hits?.length) {
+    html += table(r.hits, [
+      { label: "Result", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b> <span class="muted">${h.result}%</span>` },
+      { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18s${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
+      { label: "Height", key: null, html: (h) => `${h.height}%`, num: true },
+      { label: "Points", key: null, html: (h) => `<b>${toned(h.points, range, n1(h.points))}</b>`, num: true },
+      { label: "War", key: null, html: (h) => `<span class="muted">${h.kind === "cwl" ? `CWL round ${h.round}` : "War"} vs</span> ${esc(h.opponent)}` },
+      { label: "Date", key: null, html: (h) => `<span class="muted">${when(h.when)}</span>`, num: true },
+    ]);
+  }
+  return html + `<p class="note">Every CWL opponent is a TH18 now, so this rates hits on TH18s (in the last ${R.window_days} days, CWL and regular wars;
+    free hits don't count). Each hit scores its result × the base's height. The result is stars plus destruction, out of 4 (a three-star is 100%,
+    2 stars at 95% is 74%). The height is where the base sat among that war's TH18s: 100% for their top one down to 50% for their bottom one,
+    so #2 of 4 and #4 of 8 count about the same. Readiness is the average of the last ${R.recent_hits} hits. Eligible: ${R.threshold}+ from at
+    least ${R.min_hits} hits, war preference in, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`;
 }
 
 // Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.
@@ -794,6 +855,7 @@ function playerPage(tag, sub) {
       from a daily check of their profile. Buildings and walls aren't counted: the game doesn't share them.</p>` : "");
   }
   html += warStats(m);
+  html += cwlReadiness(m);
   const rec = cwlRecord(tag), seasons = rec.rows;
   if (seasons.length) {
     const best = Math.min(...seasons.map((r) => r.position));
@@ -1342,6 +1404,22 @@ function leaderBox(tag) {
       }
     });
   });
+  // CWL eligibility: the leaders can make the call either way, with a reason; or go back to the numbers.
+  const o = (LEADER.cwl_overrides || []).find((x) => x.tag === tag);
+  setTimeout(() => {
+    document.querySelectorAll("[data-cwl]").forEach((b) => b.addEventListener("click", async () => {
+      if (b.dataset.cwl === "clear") {
+        if (confirm("Go back to the worked-out CWL status?")) await veteranPost("/admin/api/cwl/clear", { tag });
+        return;
+      }
+      const reason = prompt(`Why? (optional, up to ${LEADER.cwl_reason_max || 120} characters; only leaders see it)`, "");
+      if (reason !== null) await veteranPost("/admin/api/cwl/override", { tag, status: b.dataset.cwl, reason });
+    }));
+  });
+  html += `<p class="note">${o ? `CWL: a leaders' call, <b>${o.status === "eligible" ? "eligible" : "not eligible"}</b>, by ${esc(o.by)} on ${esc(when(o.ts))}${o.reason ? `: “${esc(o.reason)}”` : ""}. `
+    : "CWL: worked out from TH18 hits. "}${o?.status !== "eligible" ? `<button type="button" class="mode" data-cwl="eligible">Make eligible</button> ` : ""}${
+    o?.status !== "not_eligible" ? `<button type="button" class="mode" data-cwl="not_eligible">Make not eligible</button> ` : ""}${
+    o ? `<button type="button" class="mode" data-cwl="clear">Back to the numbers</button>` : ""}<br><span class="muted">The public page shows a change at the next site update.</span></p>`;
   const m = MEMBERS.get(tag);
   html += `<p class="note">${v ? `Clan veteran since ${esc(when(v.since, { month: "short", day: "numeric", year: "numeric" }))} (by ${esc(v.by)}). ` : ""}<button type="button" class="mode" id="vetbtn" data-name="${esc(m ? m.name : "")}">${v ? "Remove veteran" : "Make a veteran"}</button></p>`;
   return html + `</section>`;
