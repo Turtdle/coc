@@ -608,7 +608,7 @@ function cwlReadiness(m) {
   } else if (r.status === "eligible") {
     why = `Readiness ${pts(r.rating)} from ${plural(r.count, "TH18 hit")}: eligible (${R.threshold}+ from at least ${R.min_hits}).`;
   } else if (r.status === "not_yet") {
-    why = `Readiness ${pts(r.rating)}: ${pts(Math.max(1, R.threshold - r.rating))} short of ${R.threshold}. Higher bases and cleaner hits raise it; it's the average of the last ${R.recent_hits} TH18 hits.`;
+    why = `Readiness ${pts(r.rating)}: ${Math.max(1, R.threshold - Math.round(r.rating))} short of ${R.threshold}. Higher bases and cleaner hits raise it; it's the average of the last ${R.recent_hits} TH18 hits.`;
   } else if (!r.count) {
     why = `No TH18 hits yet in the last ${R.window_days} days. ${R.min_hits} hits on TH18s averaging ${R.threshold} or more earn a CWL spot; regular wars count.`;
   } else {
@@ -624,8 +624,9 @@ function cwlReadiness(m) {
   ]) + `<p class="note">${why}</p>`;
   if (r.hits?.length) {
     html += table(r.hits, [
-      { label: "Result", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b> <span class="muted">${h.result}%</span>` },
+      { label: "Hit", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b>` },
       { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18s${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
+      { label: "Result", key: null, html: (h) => `${h.result}%`, num: true },
       { label: "Height", key: null, html: (h) => `${h.height}%`, num: true },
       { label: "Points", key: null, html: (h) => `<b>${toned(h.points, range, n1(h.points))}</b>`, num: true },
       { label: "War", key: null, html: (h) => `<span class="muted">${h.kind === "cwl" ? `CWL round ${h.round}` : "War"} vs</span> ${esc(h.opponent)}` },

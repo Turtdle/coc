@@ -239,8 +239,7 @@ img.league { width: 22px; height: 22px; vertical-align: middle; margin-right: 5p
        text-transform: uppercase; white-space: nowrap; vertical-align: 2px; }
 h2 .vet { font-size: 12px; padding: 3px 11px 2px; vertical-align: 7px; }
 /* CWL eligibility (cwl_ready.py): the status as a small word, coloured by it (win, gold, muted, loss). */
-.cwl-st { font: 600 10.5px/1.5 var(--text); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
-.ledger .cwl-st { font-size: 13px; }
+.cwl-st { font-weight: 600; font-size: .85em; white-space: nowrap; }
 [dir="auto"] { unicode-bidi: plaintext; text-align: left; }
 
 /* Clan news and the member log: the date, then what happened. */
