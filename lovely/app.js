@@ -533,7 +533,7 @@ function membersPage() {
     Ratings are points per hit, weighed by the Town Hall gap and level (see a member's page); they're coloured from the
     clan's lowest (red) to highest (green).</p>` + table(rows, [
     { label: "TH", key: (m) => m.th, html: (m) => th(m.th) },
-    { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetMark(m) },
+    { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => who(m.tag, m.name) + vetDot(m) },
     { label: "Role", key: (m) => -ROLE_ORDER[m.role], html: (m) => `<span class="role ${esc(m.role)}">${ROLES[m.role] || ""}</span>` },
     { label: "League", key: (m) => m.league_id ?? -1, html: (m) => (m.league_icon ? `<img class="league" src="${esc(m.league_icon)}" alt="${esc(m.league || "")}" title="${esc(m.league || "")}">` : `<span class="muted" title="Unranked">–</span>`) },
     { label: "Atk rating", key: (m) => (m.war.all.attacks ? m.war.all.attack_rating : -1), html: (m) => (m.war.all.attacks && typeof m.war.all.attack_rating === "number" ? toned(m.war.all.attack_rating, ra, pts(m.war.all.attack_rating)) : "–"), num: true },
@@ -779,6 +779,8 @@ function warStats(m) {
 
 // A leader's mark of honour (veterans.py): "Veteran", or "Veteran · <title>", next to the name.
 const vetMark = (m) => (m.veteran ? ` <span class="vet">${esc(m.veteran)}</span>` : "");
+// The quiet version for the Members table: a small blossom, the mark itself on hover.
+const vetDot = (m) => (m.veteran ? ` <span class="vet-dot" title="${esc(m.veteran)}" aria-label="${esc(m.veteran)}" role="img">✿</span>` : "");
 
 // What changed in a member's village since the reader's previous visit (reader/compare.py): boxes drawn
 // over the screenshot, and one line naming the buildings. Patches the model couldn't name as an upgrade
