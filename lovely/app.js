@@ -593,7 +593,8 @@ function cwlReadiness(m) {
   const free = cwlFree && r.with_free, v = free ? r.with_free : r;
   setTimeout(() => {
     const box = document.getElementById("cwlfree");
-    if (box) box.addEventListener("change", () => { cwlFree = box.checked; route(); });
+    // Redraw just this section, so the page stays where it is.
+    if (box) box.addEventListener("change", () => { cwlFree = box.checked; document.getElementById("cwlelig").outerHTML = cwlReadiness(m); });
   });
   const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -615,7 +616,7 @@ function cwlReadiness(m) {
   }
   if (r.heroes_vs != null) why += ` Heroes: ${r.heroes_vs >= 0 ? `${r.heroes_vs}% above` : `${-r.heroes_vs}% below`} the eligible members' median.`;
   const vs = v.rate == null || avg.rate == null ? "" : v.rate >= avg.rate ? "win" : "loss";
-  let html = `<h2>CWL eligibility</h2>` + (r.with_free ? `<label class="cwl-free"><input type="checkbox" id="cwlfree"${free ? " checked" : ""}> Include free hits</label>` : "") + ledger([
+  let html = `<section id="cwlelig"><h2>CWL eligibility</h2>` + (r.with_free ? `<label class="cwl-free"><input type="checkbox" id="cwlfree"${free ? " checked" : ""}> Include free hits</label>` : "") + ledger([
     [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
     [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}`, vs],
     [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
@@ -638,7 +639,7 @@ function cwlReadiness(m) {
     among that war's TH18s: 100% for their top one, 0% for their bottom one, evenly in between; the average shows how high they hit.
     The average to beat is ${avgName}: ${avg.source === "roster" ? `everyone on the CWL roster${avg.players ? ` (${avg.players} with TH18 hits)` : ""}` : "the whole clan (nobody is on the CWL roster yet)"},
     ${avg.hits ? `${avg.triples} three-stars in ${avg.hits} hits` : "no hits yet"}, each player's last ${R.recent_hits}. Eligible: at least ${R.min_hits} TH18 hits,
-    a 3-star rate at or above that, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`);
+    a 3-star rate at or above that, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`) + `</section>`;
 }
 
 // Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.
