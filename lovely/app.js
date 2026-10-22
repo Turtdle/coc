@@ -599,7 +599,7 @@ function cwlReadiness(m) {
   const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const avg = v.roster || {}, avgName = avg.source === "roster" ? "the CWL roster's" : "the clan's";
-  const avgText = avg.rate == null ? "" : `${pct(avg.rate / 100)}`;
+  const avgText = r.roster?.rate == null ? "" : pct(r.roster.rate / 100);  // the explanation: always the official numbers
   let why;
   if (r.override) {
     why = `A leaders' call: <b>${label.toLowerCase()}</b>. By the numbers they'd be ${(CWL_STATUS[r.computed] || ["–"])[0].toLowerCase()}${r.computed === "out" && r.out_reason ? ` (${esc(r.out_reason)})` : ""}.`;
@@ -622,8 +622,7 @@ function cwlReadiness(m) {
     [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
     [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
-  ]) + `<p class="note">${free ? `Showing free hits too (on a base already three-starred, in regular wars). The status doesn't count them: by it, ${
-    r.rate == null ? "they have no TH18 hits yet" : `they three-star ${pct(r.rate / 100)} against ${avgName} ${r.roster?.rate == null ? "–" : pct(r.roster.rate / 100)}`}. ` : ""}${why}</p>`;
+  ]) + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
   let workings = "";
   if (v.hits?.length) {
     workings += table(v.hits, [
