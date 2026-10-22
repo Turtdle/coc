@@ -520,7 +520,7 @@ function streaksPage(order) {
   return html;
 }
 
-// CWL readiness and eligibility (cwl_ready.py): how well a member hits TH18s, and whether that earns a CWL
+// CWL eligibility (cwl_ready.py): how well a member three-stars TH18s, and whether that earns a CWL
 // spot. A leaders' call (override) wins over the worked-out status. Shown on member pages only.
 const CWL_STATUS = { eligible: ["Eligible", "win"], not_yet: ["Not yet", "gold"], trial: ["Trial", "muted"],
   out: ["Out", "loss"], not_eligible: ["Not eligible", "loss"] };
@@ -583,52 +583,62 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
 
-// A member's CWL readiness: their status, what it's made of, what's left to earn a spot, and the TH18 hits.
+// A member's CWL eligibility: their TH18 3-star rate against the roster's, how high they hit, what's left to
+// earn a spot, and the TH18 hits.
+let cwlFree = false;  // the "Include free hits" toggle: kept while moving between members
 function cwlReadiness(m) {
   const r = m.cwl_ready, R = DATA.cwl_rules;
-  if (!r || !R) return "";
+  if (!r || !R || !("rate" in r)) return "";
+  // The numbers shown: as the status counts them (no free hits), or with free hits when toggled on.
+  const free = cwlFree && r.with_free, v = free ? r.with_free : r;
+  setTimeout(() => {
+    const box = document.getElementById("cwlfree");
+    if (box) box.addEventListener("change", () => { cwlFree = box.checked; route(); });
+  });
   const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  const range = { lo: 40, hi: 100 };
+  const avg = v.roster || {}, avgName = avg.source === "roster" ? "the CWL roster's" : "the clan's";
+  const avgText = avg.rate == null ? "" : `${pct(avg.rate / 100)}`;
   let why;
   if (r.override) {
     why = `A leaders' call: <b>${label.toLowerCase()}</b>. By the numbers they'd be ${(CWL_STATUS[r.computed] || ["–"])[0].toLowerCase()}${r.computed === "out" && r.out_reason ? ` (${esc(r.out_reason)})` : ""}.`;
   } else if (r.status === "out") {
     why = `Out for now: ${esc(r.out_reason || "")}.`;
   } else if (r.status === "eligible") {
-    why = `Readiness ${pts(r.rating)} from ${plural(r.count, "TH18 hit")}: eligible (${R.threshold}+ from at least ${R.min_hits}).`;
+    why = `Three-stars ${pct(r.rate / 100)} of TH18s${avgText ? `, at or above ${avgName} ${avgText}` : ""}: eligible.`;
   } else if (r.status === "not_yet") {
-    why = `Readiness ${pts(r.rating)}: ${Math.max(1, R.threshold - Math.round(r.rating))} short of ${R.threshold}. Higher bases and cleaner hits raise it; it's the average of the last ${R.recent_hits} TH18 hits.`;
+    why = `Three-stars ${pct(r.rate / 100)} of TH18s, under ${avgName} ${avgText}. Beating the average earns a CWL spot.`;
   } else if (!r.count) {
-    why = `No TH18 hits yet in the last ${R.window_days} days. ${R.min_hits} hits on TH18s averaging ${R.threshold} or more earn a CWL spot; regular wars count.`;
+    why = `No TH18 hits yet. ${R.min_hits} hits on TH18s, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
   } else {
-    why = `${r.count} of ${R.min_hits} TH18 hits so far, averaging ${pts(r.rating)}. ${plural(R.min_hits - r.count, "more hit")} on TH18s, with the average at ${R.threshold}+, earn a CWL spot; regular wars count.`;
+    why = `${r.count} of ${R.min_hits} TH18 hits so far. ${plural(R.min_hits - r.count, "more hit")} on TH18s, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
   }
   if (r.heroes_vs != null) why += ` Heroes: ${r.heroes_vs >= 0 ? `${r.heroes_vs}% above` : `${-r.heroes_vs}% below`} the eligible members' median.`;
-  let html = `<h2>CWL readiness</h2>` + ledger([
+  const vs = v.rate == null || avg.rate == null ? "" : v.rate >= avg.rate ? "win" : "loss";
+  let html = `<h2>CWL eligibility</h2>` + (r.with_free ? `<label class="cwl-free"><input type="checkbox" id="cwlfree"${free ? " checked" : ""}> Include free hits</label>` : "") + ledger([
     [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
-    [r.rating == null ? "–" : toned(r.rating, range, pts(r.rating)), "readiness"],
-    [num(r.count), `TH18 hits, ${R.window_days} days`],
-    r.form != null && [`${r.form > 0 ? "+" : ""}${n1(r.form)}`, `form: last ${R.form_hits} vs the ${R.form_hits} before`, r.form > 0 ? "win" : r.form < 0 ? "loss" : ""],
+    [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}`, vs],
+    [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
+    [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
-  ]) + `<p class="note">${why}</p>`;
+  ]) + `<p class="note">${free ? `Showing free hits too (on a base already three-starred, in regular wars). The status doesn't count them: by it, ${
+    r.rate == null ? "they have no TH18 hits yet" : `they three-star ${pct(r.rate / 100)} against ${avgName} ${r.roster?.rate == null ? "–" : pct(r.roster.rate / 100)}`}. ` : ""}${why}</p>`;
   let workings = "";
-  if (r.hits?.length) {
-    workings += table(r.hits, [
-      { label: "Hit", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b>` },
+  if (v.hits?.length) {
+    workings += table(v.hits, [
+      { label: "Hit", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b>${h.free ? ` ${FREE_HIT}` : ""}` },
       { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18s${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
-      { label: "Result", key: null, html: (h) => `${h.result}%`, num: true },
-      { label: "Height", key: null, html: (h) => `${h.height}%`, num: true },
-      { label: "Points", key: null, html: (h) => `<b>${toned(h.points, range, n1(h.points))}</b>`, num: true },
+      { label: "Rank", key: null, html: (h) => `${h.height}%`, num: true },
       { label: "War", key: null, html: (h) => `<span class="muted">${h.kind === "cwl" ? `CWL round ${h.round}` : "War"} vs</span> ${esc(h.opponent)}` },
       { label: "Date", key: null, html: (h) => `<span class="muted">${when(h.when)}</span>`, num: true },
     ]);
   }
-  return html + calc("cwl", workings + `<p class="note">Every CWL opponent is a TH18 now, so this rates hits on TH18s (in the last ${R.window_days} days, CWL and regular wars;
-    free hits don't count). Each hit scores its result × the base's height. The result is stars plus destruction, out of 4 (a three-star is 100%,
-    2 stars at 95% is 74%). The height is where the base sat among that war's TH18s: 100% for their top one down to ${R.bottom ?? 80}% for their bottom one,
-    so #2 of 4 and #4 of 8 count about the same. Readiness is the average of the last ${R.recent_hits} hits. Eligible: ${R.threshold}+ from at
-    least ${R.min_hits} hits, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`);
+  return html + calc("cwl", workings + `<p class="note">Every CWL opponent is a TH18 now, so this looks at each member's last ${R.recent_hits} hits on
+    TH18s (CWL and regular wars; free hits don't count). The 3-star rate is how many of them were three-stars. The rank is where each base sat
+    among that war's TH18s: 100% for their top one, 0% for their bottom one, evenly in between; the average shows how high they hit.
+    The average to beat is ${avgName}: ${avg.source === "roster" ? `everyone on the CWL roster${avg.players ? ` (${avg.players} with TH18 hits)` : ""}` : "the whole clan (nobody is on the CWL roster yet)"},
+    ${avg.hits ? `${avg.triples} three-stars in ${avg.hits} hits` : "no hits yet"}, each player's last ${R.recent_hits}. Eligible: at least ${R.min_hits} TH18 hits,
+    a 3-star rate at or above that, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`);
 }
 
 // Donated vs received as one bar split between the two, with the ratio and the member's place in the clan.

@@ -258,6 +258,9 @@ h2 .vet { font-size: 12px; padding: 3px 11px 2px; vertical-align: 7px; }
 }
 /* CWL eligibility (cwl_ready.py): the status as a small word, coloured by it (win, gold, muted, loss). */
 .cwl-st { font-weight: 600; white-space: nowrap; }
+.cwl-free { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 10px; color: var(--ink-2); font-size: 13.5px;
+            cursor: pointer; user-select: none; }
+.cwl-free input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 [dir="auto"] { unicode-bidi: plaintext; text-align: left; }
 
 /* Clan news and the member log: the date, then what happened. */
