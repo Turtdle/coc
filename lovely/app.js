@@ -585,6 +585,18 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
 
 // A member's CWL eligibility: their TH18 3-star rate against the roster's, how high they hit, what's left to
 // earn a spot, and the TH18 hits.
+// Where a member's TH18 3-star rate sits against the average to beat: a bar with their marker and a tick at
+// the average. The bar starts at 50% (or lower, to fit both) so the usual 80-100% range isn't squeezed.
+function cwlBar(rate, avg, who) {
+  if (rate == null || avg == null) return "";
+  const lo = Math.min(50, Math.floor(Math.min(rate, avg) / 10) * 10), at = (x) => `${((x - lo) / (100 - lo) * 100).toFixed(1)}%`;
+  return `<div class="cwl-bar" role="img" aria-label="TH18 3-star rate ${Math.round(rate)}%, ${who} average ${Math.round(avg)}%">
+      <div class="cwl-avg" style="left:${at(avg)}"><span${(avg - lo) / (100 - lo) < 0.35 ? ` style="right:auto;left:6px"` : ""}>${who} avg ${Math.round(avg)}%</span></div>
+      <div class="rating-bar"><span class="rating-mark" style="left:${at(rate)}"></span></div>
+      <div class="rating-ends"><span>${lo}%</span><span>100%</span></div>
+    </div>`;
+}
+
 let cwlFree = false;  // the "Include free hits" toggle: kept while moving between members
 function cwlReadiness(m) {
   const r = m.cwl_ready, R = DATA.cwl_rules;
@@ -622,7 +634,7 @@ function cwlReadiness(m) {
     [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
     [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
-  ]) + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
+  ]) + cwlBar(v.rate, avg.rate, avg.source === "roster" ? "roster" : "clan") + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
   let workings = "";
   if (v.hits?.length) {
     workings += table(v.hits, [
