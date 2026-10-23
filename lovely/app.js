@@ -633,8 +633,7 @@ function cwlReadiness(m) {
   const vs = v.rate == null || avg.rate == null ? "" : v.rate >= avg.rate ? "win" : "loss";
   let html = `<section id="cwlelig"><h2>CWL eligibility</h2>` + (r.with_free ? `<label class="cwl-free"><input type="checkbox" id="cwlfree"${free ? " checked" : ""}> Include free hits</label>` : "") + ledger([
     [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
-    [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}`, vs],
-    [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
+    [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}${avg.rate == null ? "" : ` · ${who} ${pct(avg.rate / 100)}`}`, vs],
     [v.stars == null ? "–" : v.stars.toFixed(2), `avg TH18 stars${avg.stars == null ? "" : ` · ${who} ${avg.stars.toFixed(2)}`}`,
       v.stars == null || avg.stars == null ? "" : v.stars >= avg.stars ? "win" : "loss"],
     [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
