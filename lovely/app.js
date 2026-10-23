@@ -585,15 +585,18 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
 
 // A member's CWL eligibility: their TH18 3-star rate against the roster's, how high they hit, what's left to
 // earn a spot, and the TH18 hits.
-// Where a member's TH18 3-star rate sits against the average to beat: a bar with their marker and a tick at
-// the average. The bar starts at 50% (or lower, to fit both) so the usual 80-100% range isn't squeezed.
-function cwlBar(rate, avg, who) {
-  if (rate == null || avg == null) return "";
-  const lo = Math.min(50, Math.floor(Math.min(rate, avg) / 10) * 10), at = (x) => `${((x - lo) / (100 - lo) * 100).toFixed(1)}%`;
-  return `<div class="cwl-bar" role="img" aria-label="TH18 3-star rate ${Math.round(rate)}%, ${who} average ${Math.round(avg)}%">
-      <div class="cwl-avg" style="left:${at(avg)}"><span${(avg - lo) / (100 - lo) < 0.35 ? ` style="right:auto;left:6px"` : ""}>${who} avg ${Math.round(avg)}%</span></div>
-      <div class="rating-bar"><span class="rating-mark" style="left:${at(rate)}"></span></div>
-      <div class="rating-ends"><span>${lo}%</span><span>100%</span></div>
+// Where a member's TH18 number sits against the roster's: a bar with their marker and a tick at the average.
+// The 3-star rate's bar starts at 50% (lower if needed) so the usual 80-100% isn't squeezed; stars run
+// from 1.5 (lower if needed) to 3. `what` names it, `fmt` writes a value.
+function cwlBar(value, avg, who, what, lo, hi, step, fmt) {
+  if (value == null || avg == null) return "";
+  lo = Math.min(lo, Math.floor(Math.min(value, avg) / step) * step);
+  const share = (x) => (x - lo) / (hi - lo), at = (x) => `${(share(x) * 100).toFixed(1)}%`;
+  return `<div class="cwl-bar" role="img" aria-label="${what} ${fmt(value)}, ${who} average ${fmt(avg)}">
+      <div class="cwl-bar-what">${what}</div>
+      <div class="cwl-avg" style="left:${at(avg)}"><span${share(avg) < 0.35 ? ` style="right:auto;left:6px"` : ""}>${who} avg ${fmt(avg)}</span></div>
+      <div class="rating-bar"><span class="rating-mark" style="left:${at(value)}"></span></div>
+      <div class="rating-ends"><span>${fmt(lo)}</span><span>${fmt(hi)}</span></div>
     </div>`;
 }
 
@@ -610,7 +613,7 @@ function cwlReadiness(m) {
   });
   const [label, cls] = CWL_STATUS[r.status] || ["–", "muted"];
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  const avg = v.roster || {}, avgName = avg.source === "roster" ? "the CWL roster's" : "the clan's";
+  const avg = v.roster || {}, who = avg.source === "roster" ? "roster" : "clan", avgName = avg.source === "roster" ? "the CWL roster's" : "the clan's";
   const avgText = r.roster?.rate == null ? "" : pct(r.roster.rate / 100);  // the explanation: always the official numbers
   let why;
   if (r.override) {
@@ -632,9 +635,12 @@ function cwlReadiness(m) {
     [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
     [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}`, vs],
     [avg.rate == null ? "–" : pct(avg.rate / 100), avg.source === "roster" ? "CWL roster average" : "clan average"],
+    [v.stars == null ? "–" : v.stars.toFixed(2), `avg TH18 stars${avg.stars == null ? "" : ` · ${who} ${avg.stars.toFixed(2)}`}`,
+      v.stars == null || avg.stars == null ? "" : v.stars >= avg.stars ? "win" : "loss"],
     [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
-  ]) + cwlBar(v.rate, avg.rate, avg.source === "roster" ? "roster" : "clan") + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
+  ]) + `<div class="cwl-bars">${cwlBar(v.rate, avg.rate, who, "TH18 3-star rate", 50, 100, 10, (x) => `${Math.round(x)}%`)}${
+    cwlBar(v.stars, avg.stars, who, "Average TH18 stars", 1.5, 3, 0.5, (x) => x.toFixed(2).replace(/\.?0+$/, "") + "★")}</div>` + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
   let workings = "";
   if (v.hits?.length) {
     workings += table(v.hits, [
