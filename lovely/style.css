@@ -520,7 +520,6 @@ input[type="search"] {
 .chat mark { background: var(--blossom); color: var(--ink); padding: 0 2px; }
 
 @media (max-width: 720px) {
-  .names .n { white-space: normal; }  /* a long one ("2 of 3, never three-starred") may wrap too */
   .mast { padding: 96px 16px 22px; }
   .branch { width: 250px; right: -34px; top: -8px; }
   .mast-in { gap: 14px; }
