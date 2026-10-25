@@ -520,6 +520,9 @@ input[type="search"] {
 .chat mark { background: var(--blossom); color: var(--ink); padding: 0 2px; }
 
 @media (max-width: 720px) {
+  .names { line-height: 1.5; }  /* name lists: one per line on a phone, no separator dots */
+  .names .n { display: block; padding: 3px 0; }
+  .names .n + .n::before { content: none; }
   .mast { padding: 96px 16px 22px; }
   .branch { width: 250px; right: -34px; top: -8px; }
   .mast-in { gap: 14px; }
