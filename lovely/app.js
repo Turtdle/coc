@@ -44,7 +44,8 @@ const SWORDS = `<svg class="swords" viewBox="0 0 64 64" aria-hidden="true" focus
 const FREE_HIT = `<span class="free" title="That base was already three-starred, so this hit doesn't count in stats">free hit</span>`;
 // A player's name, linked to their page while they're in the clan.
 const who = (tag, name) => (tag && MEMBERS.has(tag) ? `<a href="#/player/${encodeURIComponent(tag)}">${esc(name)}</a>` : esc(name));
-const names = (items) => `<p class="names">${items.map((x) => `<span class="n">${x}</span>`).join("")}</p>`;
+// (Joined with spaces: each name stays whole, and the line can wrap between them on a phone.)
+const names = (items) => `<p class="names">${items.map((x) => `<span class="n">${x}</span>`).join(" ")}</p>`;
 // Figures in a row between rules: [[value html, label, class], ...]; falsy entries are skipped.
 const ledger = (items, cls = "") => `<div class="ledger ${cls}"><div class="in">${items.filter(Boolean)
   .map(([value, label, cls = ""]) => `<div><b class="${cls}">${value}</b><span>${esc(label)}</span></div>`).join("")}</div></div>`;
