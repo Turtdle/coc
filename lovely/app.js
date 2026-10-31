@@ -1687,7 +1687,7 @@ function route() {
 
 async function main() {
   try {
-    DATA = await (await fetch(`data.json?v=${Math.floor(Date.now() / 600000)}`)).json();
+    DATA = await (await fetch(`data.json?v=${Math.floor(Date.now() / 120000)}`)).json();
   } catch (e) {
     document.getElementById("page").innerHTML = `<p class="empty">Couldn't load the clan data.</p>`;
     return;
