@@ -350,6 +350,9 @@ table.grid td.mid, table.grid th.mid { padding-left: 4px; padding-right: 4px; mi
 .cell.s0 { color: var(--muted); }
 .cell.missed { color: var(--loss); font: 600 14px var(--text); }
 .cell.later { color: var(--muted); font: 400 14px var(--text); }
+/* Defenses: stars a base gave up, so none is the good one. */
+.cell.d0 { color: var(--accent); }
+.cell.d3 { color: var(--muted); }
 .roundnav { display: flex; justify-content: space-between; gap: 16px; margin-top: 26px; font-size: 14px; color: var(--ink-2); }
 .roundnav span { display: flex; gap: 18px; }
 
@@ -445,6 +448,7 @@ h3 small { margin-left: 8px; font-weight: 400; letter-spacing: .04em; text-trans
 .scope-tabs button { padding: 0 0 4px; border: 0; border-bottom: 1px solid transparent; background: none; cursor: pointer;
                      font: 600 11.5px/1.3 var(--text); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .scope-tabs button:hover { color: var(--ink); }
+.scope-tabs.grid-tabs { margin: 0 0 4px; }
 .scope-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 .scope-body .ledger { margin-top: 10px; }
 

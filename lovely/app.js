@@ -356,33 +356,70 @@ function seasonPage() {
       <td class="num muted wide">avg ${avg(0)}% – ${avg(1)}%</td></tr>` : ""}</tbody></table></div></section>`;
   html += `<div class="cols">${group}${rounds}</div>`;
 
-  // Members x rounds: the stars each member got in each round.
+  // Members x rounds: the stars each member got in each round, or (Defenses) gave up on their own base.
   const totals = new Map(c.members.map((m) => [m.tag, m]));
   const people = new Map();
   for (const r of c.rounds) {
     for (const m of r.lineup) {
-      const p = people.get(m.tag) || { tag: m.tag, name: m.name, th: m.th, cells: {} };
+      const p = people.get(m.tag) || { tag: m.tag, name: m.name, th: m.th, cells: {}, def: {}, given: 0, against: 0, held: 0, defended: 0 };
       p.cells[r.round] = m.attacks.length ? m.attacks[0].stars : { warEnded: "missed", inWar: "pending", preparation: "in" }[r.state];
+      // A base can be hit more than once in a round; its best hit is what it gave up.
+      p.def[r.round] = r.state === "preparation" ? "in" : m.defense.n ? m.defense.stars : r.state === "warEnded" ? "clean" : "pending";
+      if (r.state === "warEnded") {
+        p.defended += 1;
+        p.given += m.defense.stars;
+        p.against += m.defense.pct;
+        p.held += m.defense.stars < 3 ? 1 : 0;
+      }
       people.set(m.tag, p);
     }
   }
   const rows = [...people.values()].map((p) => ({ ...p, ...(totals.get(p.tag) || { stars: 0, destruction: 0, attacks: 0, wars: 0 }) }));
+  const later = { pending: `<span class="cell later" title="Not attacked yet">…</span>`, in: `<span class="cell later" title="In the line-up">•</span>` };
   const cell = (v) => (typeof v === "number" ? `<span class="cell s${v}">${v}</span>`
-    : v === "missed" ? `<span class="cell missed" title="Missed">✗</span>`
-    : v === "pending" ? `<span class="cell later" title="Hasn't attacked yet">…</span>`
-    : v === "in" ? `<span class="cell later" title="In the line-up">•</span>` : "");
-  html += `<h2>Members</h2><p class="note">Stars in each round (✗ missed, … still to attack, • in the next line-up). Totals count finished rounds, like the in-game Clan tab.</p>`
-    + table(rows, [
-      { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th, "small")} ${who(m.tag, m.name)}` },
-      ...c.rounds.map((r) => ({
-        label: `R${r.round}`, key: (m) => (typeof m.cells[r.round] === "number" ? m.cells[r.round] : -1), html: (m) => cell(m.cells[r.round]), center: true,
-      })),
-      { label: "Stars", key: (m) => m.stars, html: (m) => `<b>${m.stars}</b> ${star}`, num: true },
-      { label: "Destruction", key: (m) => m.destruction, html: (m) => `${num(Math.round(m.destruction))}%`, num: true },
-      { label: "Hits", key: (m) => m.attacks, html: (m) => `${m.attacks}/${m.wars}`, num: true },
-    ], c.rounds.length + 1, -1, () => "", "grid");
+    : v === "missed" ? `<span class="cell missed" title="Missed">✗</span>` : later[v] || "");
+  const defCell = (v) => (typeof v === "number" ? `<span class="cell d${v}" title="Gave up ${v} star${v === 1 ? "" : "s"}">${v}</span>`
+    : v === "clean" ? `<span class="cell d0" title="Never attacked">–</span>` : later[v] || "");
+  const grids = {
+    attacks: () => `<p class="note">Stars in each round (✗ missed, … still to attack, • in the next line-up). Totals count finished rounds, like the in-game Clan tab.</p>`
+      + table(rows, [
+        { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th, "small")} ${who(m.tag, m.name)}` },
+        ...c.rounds.map((r) => ({
+          label: `R${r.round}`, key: (m) => (typeof m.cells[r.round] === "number" ? m.cells[r.round] : -1), html: (m) => cell(m.cells[r.round]), center: true,
+        })),
+        { label: "Stars", key: (m) => m.stars, html: (m) => `<b>${m.stars}</b> ${star}`, num: true },
+        { label: "Destruction", key: (m) => m.destruction, html: (m) => `${num(Math.round(m.destruction))}%`, num: true },
+        { label: "Hits", key: (m) => m.attacks, html: (m) => `${m.attacks}/${m.wars}`, num: true },
+      ], c.rounds.length + 1, -1, () => "", "grid"),
+    defenses: () => `<p class="note">Stars each member's base gave up in each round: its best hit against it (– never attacked, … not attacked yet, • in the next line-up). Totals count finished rounds; held means not three-starred.</p>`
+      + table(rows, [
+        { label: "Member", key: (m) => m.name.toLowerCase(), html: (m) => `${th(m.th, "small")} ${who(m.tag, m.name)}` },
+        ...c.rounds.map((r) => ({
+          label: `R${r.round}`, key: (m) => (typeof m.def[r.round] === "number" ? m.def[r.round] : m.def[r.round] === "clean" ? -0.5 : -1),
+          html: (m) => defCell(m.def[r.round]), center: true,
+        })),
+        { label: "Given up", key: (m) => m.given, html: (m) => `<b>${m.given}</b> ${star}`, num: true },
+        { label: "Destruction", key: (m) => (m.defended ? m.against / m.defended : -1), html: (m) => (m.defended ? `${num(Math.round(m.against / m.defended))}%` : "–"), num: true },
+        { label: "Held", key: (m) => (m.defended ? m.held / m.defended : -1), html: (m) => `${m.held}/${m.defended}`, num: true },
+      ], c.rounds.length + 3, -1, () => "", "grid"),
+  };
+  if (!grids[cwlGrid]) cwlGrid = "attacks";
+  setTimeout(() => {
+    const box = document.getElementById("cwlgrid");
+    if (!box) return;
+    box.querySelectorAll("[data-grid]").forEach((b) => b.addEventListener("click", () => {
+      cwlGrid = b.dataset.grid;
+      box.querySelectorAll("[data-grid]").forEach((x) => x.setAttribute("aria-selected", x === b));
+      box.querySelector(".scope-body").innerHTML = grids[cwlGrid]();
+    }));
+  });
+  html += `<h2>Members</h2><div id="cwlgrid"><div class="scope-tabs grid-tabs" role="tablist" aria-label="Attacks or defenses">${[["attacks", "Attacks"], ["defenses", "Defenses"]]
+    .map(([k, name]) => `<button type="button" role="tab" data-grid="${k}" aria-selected="${k === cwlGrid}">${name}</button>`).join("")}</div>
+    <div class="scope-body">${grids[cwlGrid]()}</div></div>`;
   return html;
 }
+// Which Members grid the CWL page shows; kept while moving between pages.
+let cwlGrid = "attacks";
 
 // A big link into the war on now.
 function warButton(w) {
