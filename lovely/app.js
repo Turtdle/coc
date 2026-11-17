@@ -16,6 +16,9 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const num = (n) => (n ?? 0).toLocaleString();
 const pct = (x) => `${Math.round((x || 0) * 100)}%`;
 const th = (level, cls = "") => (level ? `<img class="th ${cls}" src="img/th${level | 0}.png" alt="TH${level | 0}" title="Town Hall ${level | 0}">` : "");
+// A Town Hall with no badge yet (a new level) shows as its "TH20" text, not a broken image. (Image errors
+// don't bubble, hence capturing; the page's CSP rules out an inline onerror.)
+document.addEventListener("error", (e) => { if (e.target.matches?.("img.th")) e.target.replaceWith(e.target.alt); }, true);
 const stars = (n) => [0, 1, 2].map((i) => `<img class="star" src="img/star_${i < n ? "on" : "off"}.png" alt="">`).join("");
 const star = `<img class="star" src="img/star_on.png" alt="★">`;
 const when = (ts, opts = { month: "short", day: "numeric" }) => (ts ? new Date(ts * 1000).toLocaleString(undefined, opts) : "");
@@ -566,7 +569,7 @@ function streaksPage(order) {
   return html;
 }
 
-// CWL eligibility (cwl_ready.py): how well a member three-stars TH18s, and whether that earns a CWL
+// CWL eligibility (cwl_ready.py): how well a member three-stars TH18+ bases, and whether that earns a CWL
 // spot. A leaders' call (override) wins over the worked-out status. Shown on member pages only.
 const CWL_STATUS = { eligible: ["Eligible", "win"], not_yet: ["Not yet", "gold"], trial: ["Trial", "muted"],
   out: ["Out", "loss"], not_eligible: ["Not eligible", "loss"] };
@@ -629,9 +632,9 @@ function leaderboardsPage(metric = "attack_rating", scope = "all") {
     In regular wars, a hit on a base that was already three-starred is a free hit and doesn't count; in CWL every hit counts.</p>`;
 }
 
-// A member's CWL eligibility: their TH18 3-star rate against the roster's, how high they hit, what's left to
-// earn a spot, and the TH18 hits.
-// Where a member's TH18 number sits against the roster's: a bar with their marker and a tick at the average.
+// A member's CWL eligibility: their TH18+ 3-star rate against the roster's, how high they hit, what's left to
+// earn a spot, and the TH18+ hits.
+// Where a member's TH18+ number sits against the roster's: a bar with their marker and a tick at the average.
 // The 3-star rate's bar starts at 50% (lower if needed) so the usual 80-100% isn't squeezed; stars run
 // from 1.5 (lower if needed) to 3. `what` names it, `fmt` writes a value.
 function cwlBar(value, avg, who, what, lo, hi, step, fmt) {
@@ -667,40 +670,40 @@ function cwlReadiness(m) {
   } else if (r.status === "out") {
     why = `Out for now: ${esc(r.out_reason || "")}.`;
   } else if (r.status === "eligible") {
-    why = `Three-stars ${pct(r.rate / 100)} of TH18s${avgText ? `, at or above ${avgName} ${avgText}` : ""}: eligible.`;
+    why = `Three-stars ${pct(r.rate / 100)} of TH18+ bases${avgText ? `, at or above ${avgName} ${avgText}` : ""}: eligible.`;
   } else if (r.status === "not_yet") {
-    why = `Three-stars ${pct(r.rate / 100)} of TH18s, under ${avgName} ${avgText}. Beating the average earns a CWL spot.`;
+    why = `Three-stars ${pct(r.rate / 100)} of TH18+ bases, under ${avgName} ${avgText}. Beating the average earns a CWL spot.`;
   } else if (!r.count) {
-    why = `No TH18 hits yet. ${R.min_hits} hits on TH18s, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
+    why = `No TH18+ hits yet. ${R.min_hits} hits on TH18+ bases, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
   } else {
-    why = `${r.count} of ${R.min_hits} TH18 hits so far. ${plural(R.min_hits - r.count, "more hit")} on TH18s, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
+    why = `${r.count} of ${R.min_hits} TH18+ hits so far. ${plural(R.min_hits - r.count, "more hit")} on TH18+ bases, three-starring at least as often as ${avgName} ${avgText || "average"}, earn a CWL spot; regular wars count.`;
   }
   if (r.heroes_vs != null) why += ` Heroes: ${r.heroes_vs >= 0 ? `${r.heroes_vs}% above` : `${-r.heroes_vs}% below`} the eligible members' median.`;
   const vs = v.rate == null || avg.rate == null ? "" : v.rate >= avg.rate ? "win" : "loss";
   let html = `<section id="cwlelig"><h2>CWL eligibility</h2>` + (r.with_free ? `<label class="cwl-free"><input type="checkbox" id="cwlfree"${free ? " checked" : ""}> Include free hits</label>` : "") + ledger([
     [`<span class="cwl-st ${cls}">${label}${r.override ? "*" : ""}</span>`, r.override ? "CWL (leaders' call)" : "CWL"],
-    [v.rate == null ? "–" : pct(v.rate / 100), `TH18 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}${avg.rate == null ? "" : ` · ${who} ${pct(avg.rate / 100)}`}`, vs],
-    [v.stars == null ? "–" : v.stars.toFixed(2), `avg TH18 stars${avg.stars == null ? "" : ` · ${who} ${avg.stars.toFixed(2)}`}`,
+    [v.rate == null ? "–" : pct(v.rate / 100), `TH18+ 3-star rate${v.count ? ` (${v.triples}/${v.count})` : ""}${avg.rate == null ? "" : ` · ${who} ${pct(avg.rate / 100)}`}`, vs],
+    [v.stars == null ? "–" : v.stars.toFixed(2), `avg TH18+ stars${avg.stars == null ? "" : ` · ${who} ${avg.stars.toFixed(2)}`}`,
       v.stars == null || avg.stars == null ? "" : v.stars >= avg.stars ? "win" : "loss"],
-    [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18s hit"],
+    [v.rank == null ? "–" : pct(v.rank / 100), "avg rank of TH18+ bases hit"],
     r.slots ? [`${r.missed}/${r.slots}`, "missed, latest attacks", r.missed ? "loss" : ""] : null,
-  ]) + `<div class="cwl-bars">${cwlBar(v.rate, avg.rate, who, "TH18 3-star rate", 50, 100, 10, (x) => `${Math.round(x)}%`)}${
-    cwlBar(v.stars, avg.stars, who, "Average TH18 stars", 1.5, 3, 0.5, (x) => x.toFixed(2).replace(/\.?0+$/, "") + "★")}</div>` + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
+  ]) + `<div class="cwl-bars">${cwlBar(v.rate, avg.rate, who, "TH18+ 3-star rate", 50, 100, 10, (x) => `${Math.round(x)}%`)}${
+    cwlBar(v.stars, avg.stars, who, "Average TH18+ stars", 1.5, 3, 0.5, (x) => x.toFixed(2).replace(/\.?0+$/, "") + "★")}</div>` + `<p class="note">${free ? "Showing free hits too (on a base already three-starred, in regular wars); the status doesn't count them. " : ""}${why}</p>`;
   let workings = "";
   if (v.hits?.length) {
     workings += table(v.hits, [
       { label: "Hit", key: null, html: (h) => `${stars(h.stars)} <b>${Math.round(h.pct)}%</b>${h.free ? ` ${FREE_HIT}` : ""}` },
-      { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18s${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
+      { label: "Target", key: null, html: (h) => `#${h.rank} of ${h.of} TH18+${h.pos ? ` <span class="muted">· spot ${h.pos}</span>` : ""}` },
       { label: "Rank", key: null, html: (h) => `${h.height}%`, num: true },
       { label: "War", key: null, html: (h) => `<span class="muted">${h.kind === "cwl" ? `CWL round ${h.round}` : "War"} vs</span> ${esc(h.opponent)}` },
       { label: "Date", key: null, html: (h) => `<span class="muted">${when(h.when)}</span>`, num: true },
     ]);
   }
-  return html + calc("cwl", workings + `<p class="note">Every CWL opponent is a TH18 now, so this looks at each member's last ${R.recent_hits} hits on
-    TH18s (CWL and regular wars; free hits don't count). The 3-star rate is how many of them were three-stars. The rank is where each base sat
-    among that war's TH18s: 100% for their top one, 0% for their bottom one, evenly in between; the average shows how high they hit.
-    The average to beat is ${avgName}: ${avg.source === "roster" ? `everyone on the CWL roster${avg.players ? ` (${avg.players} with TH18 hits)` : ""}` : "the whole clan (nobody is on the CWL roster yet)"},
-    ${avg.hits ? `${avg.triples} three-stars in ${avg.hits} hits` : "no hits yet"}, each player's last ${R.recent_hits}. Eligible: at least ${R.min_hits} TH18 hits,
+  return html + calc("cwl", workings + `<p class="note">Every CWL opponent is a TH18 or TH19 now, so this looks at each member's last ${R.recent_hits} hits on
+    TH18+ bases (CWL and regular wars; free hits don't count). The 3-star rate is how many of them were three-stars. The rank is where each base sat
+    among that war's TH18+ bases: 100% for their top one, 0% for their bottom one, evenly in between; the average shows how high they hit.
+    The average to beat is ${avgName}: ${avg.source === "roster" ? `everyone on the CWL roster${avg.players ? ` (${avg.players} with TH18+ hits)` : ""}` : "the whole clan (nobody is on the CWL roster yet)"},
+    ${avg.hits ? `${avg.triples} three-stars in ${avg.hits} hits` : "no hits yet"}, each player's last ${R.recent_hits}. Eligible: at least ${R.min_hits} TH18+ hits,
     a 3-star rate at or above that, and fewer than ${R.max_missed} missed in their last ${R.slots} attacks. Leaders can make the call either way (marked *).</p>`) + `</section>`;
 }
 
@@ -777,7 +780,7 @@ function ratingParts(which, groups, rating) {
       tip("Hitting 3 or more Town Halls down is cleaning up a bottom base: it doesn't count for or against the attack rating.")}</li>`
     : which === "attack"
     ? `<li>TH${g.att_th} on TH${g.def_th} <span class="muted">(${thGap(g.gap)})</span>: ${g.by_stars ? results(g) : `${g.hits} hit${g.hits === 1 ? "" : "s"}`}. <span class="muted">Par: ${par(g.gap)}.</span> → <b>${n1(g.points)}</b> pts${
-      tip(`Hitting at par scores 100 points (on a TH18; 10% less per level below). The maths: each hit's result is its stars plus destruction ÷ 100 (a three-star is 4.0, a 2-star at 95% is 2.95), and par here (${par(g.gap)}) is ${g.expected.toFixed(1)}. Points = result ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (TH${g.def_th} level)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}.${g.above ? ` ${g.above === g.hits ? (g.hits === 1 ? "It was" : "All were") : `${g.above} of them were`} above your mirror in a regular war: points over par count 1.5×, points under par only half.` : ""} These ${g.hits} hits averaged ${(g.score / g.hits).toFixed(2)}, so ${n1(g.points / g.hits)} each.`)}</li>`
+      tip(`Hitting at par scores 100 points (on a TH18; 10% less per level below, 10% more on a TH19). The maths: each hit's result is its stars plus destruction ÷ 100 (a three-star is 4.0, a 2-star at 95% is 2.95), and par here (${par(g.gap)}) is ${g.expected.toFixed(1)}. Points = result ÷ ${g.expected.toFixed(1)} × 100 × ${g.level} (TH${g.def_th} level)${g.discount < 1 ? ` × ${g.discount} (hitting down)` : ""}.${g.above ? ` ${g.above === g.hits ? (g.hits === 1 ? "It was" : "All were") : `${g.above} of them were`} above your mirror in a regular war: points over par count 1.5×, points under par only half.` : ""} These ${g.hits} hits averaged ${(g.score / g.hits).toFixed(2)}, so ${n1(g.points / g.hits)} each.`)}</li>`
     : `<li>TH${g.att_th} hitting this TH${g.def_th} <span class="muted">(attacker ${thGap(g.gap)})</span>: held ${g.scored} of ${g.hits} × ${n1(g.each)} = <b>${n1(g.scored * g.each)}</b>${
       tip(`One hold here: 100 × ${g.gap_weight} (attacker ${thGap(g.gap)}) × ${g.level} (a TH${g.def_th} base: holds count more at lower Town Halls, at most 3x) = ${n1(g.each)} points. Three-starred hits score 0.`)}</li>`);
   return `<ul class="rating-parts">${lines.join("")}<li class="sum">${n1(total)} points ÷ ${hits} ${which === "attack" ? "hits" : "times attacked"} = <b>${pts(rating)}</b>${
@@ -1500,7 +1503,7 @@ function leaderBox(tag) {
     }));
   });
   html += `<p class="note">${o ? `CWL: a leaders' call, <b>${o.status === "eligible" ? "eligible" : "not eligible"}</b>, by ${esc(o.by)} on ${esc(when(o.ts))}${o.reason ? `: “${esc(o.reason)}”` : ""}. `
-    : "CWL: worked out from TH18 hits. "}${o?.status !== "eligible" ? `<button type="button" class="mode" data-cwl="eligible">Make eligible</button> ` : ""}${
+    : "CWL: worked out from TH18+ hits. "}${o?.status !== "eligible" ? `<button type="button" class="mode" data-cwl="eligible">Make eligible</button> ` : ""}${
     o?.status !== "not_eligible" ? `<button type="button" class="mode" data-cwl="not_eligible">Make not eligible</button> ` : ""}${
     o ? `<button type="button" class="mode" data-cwl="clear">Back to the numbers</button>` : ""}<br><span class="muted">The public page shows a change at the next site update.</span></p>`;
   const m = MEMBERS.get(tag);
