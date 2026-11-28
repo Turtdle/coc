@@ -5,14 +5,101 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://api-assets.clashofclans.com data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Lovely · Clash of Clans</title>
-  <meta name="description" content="War, CWL, raid and donation stats for the Lovely clan.">
-  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="War, CWL and donation stats for the Lovely clan.">
+  <meta name="theme-color" content="#fbf4ef">
+  <!-- ?v= makes browsers that cached "no icon" (before there was one) fetch it again; bump it when the icon changes. -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+  <link rel="preload" href="fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css?v=6b5ec10198">
 </head>
 <body>
-  <header id="top"></header>
-  <nav id="tabs"></nav>
-  <main id="page"><p class="muted center">Loading…</p></main>
+  <header class="mast">
+    <svg class="branch" viewBox="0 -26 470 250" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="petal-fill" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="24">
+          <stop class="petal-core" offset="0"/>
+          <stop class="petal-mid" offset=".38"/>
+          <stop class="petal-edge" offset="1"/>
+        </radialGradient>
+        <path id="petal" fill="url(#petal-fill)" d="M0 0C-8-4-11-14-6.5-21Q-4-24-1.5-22.5L0-20L1.5-22.5Q4-24 6.5-21C11-14 8-4 0 0Z"/>
+        <g id="flower">
+          <use href="#petal"/>
+          <use href="#petal" transform="rotate(72)"/>
+          <use href="#petal" transform="rotate(144)"/>
+          <use href="#petal" transform="rotate(216)"/>
+          <use href="#petal" transform="rotate(288)"/>
+          <g class="stamens">
+            <path d="M0 0L0-8M0 0L7.6-2.5M0 0L4.7 6.5M0 0L-4.7 6.5M0 0L-7.6-2.5"/>
+            <circle cx="0" cy="-8" r="1.2"/><circle cx="7.6" cy="-2.5" r="1.2"/><circle cx="4.7" cy="6.5" r="1.2"/>
+            <circle cx="-4.7" cy="6.5" r="1.2"/><circle cx="-7.6" cy="-2.5" r="1.2"/>
+          </g>
+          <circle class="eye" r="2.6"/>
+        </g>
+        <g id="bud">
+          <path class="calyx" d="M0 0C-3-2-4-5-2.5-7L0-5L2.5-7C4-5 3-2 0 0Z"/>
+          <ellipse class="bud" cx="0" cy="-10" rx="3.6" ry="5.6"/>
+        </g>
+      </defs>
+      <g class="bark">
+        <path stroke-width="10" d="M490 14C440 20 400 34 360 50"/>
+        <path stroke-width="7.5" d="M360 50C325 64 290 66 255 72"/>
+        <path stroke-width="5.5" d="M255 72C215 79 185 96 150 104"/>
+        <path stroke-width="3.8" d="M150 104C120 111 92 106 62 94"/>
+        <path stroke-width="2.2" d="M62 94C50 89 40 84 28 82"/>
+        <path stroke-width="3.4" d="M376 44C370 30 362 20 346 12"/>
+        <path stroke-width="1.8" d="M346 12C340 8 334 6 326 6"/>
+        <path stroke-width="2.8" d="M302 63C298 80 292 96 280 112"/>
+        <path stroke-width="2.6" d="M232 76C226 60 214 50 200 44"/>
+        <path stroke-width="2" d="M118 108C116 124 112 136 100 146"/>
+      </g>
+      <use href="#bud" transform="translate(362 26) rotate(-28)"/>
+      <use href="#bud" transform="translate(214 58) rotate(-50) scale(.9)"/>
+      <use href="#bud" transform="translate(296 88) rotate(160) scale(.85)"/>
+      <use href="#bud" transform="translate(70 97) rotate(200) scale(.8)"/>
+      <use href="#bud" transform="translate(326 6) rotate(-80) scale(.8)"/>
+      <use href="#flower" transform="translate(346 12) rotate(10) scale(.95)"/>
+      <use href="#flower" transform="translate(408 31) rotate(-8) scale(.72)"/>
+      <use href="#flower" transform="translate(322 60) rotate(-15) scale(.8)"/>
+      <use href="#flower" transform="translate(280 114) rotate(25) scale(1.05)"/>
+      <use href="#flower" transform="translate(252 77) rotate(4) scale(.68)"/>
+      <use href="#flower" transform="translate(200 44) rotate(40) scale(.9)"/>
+      <use href="#flower" transform="translate(150 104) rotate(-30) scale(.85)"/>
+      <use href="#flower" transform="translate(100 148) rotate(15) scale(.9)"/>
+      <use href="#flower" transform="translate(30 82) rotate(50) scale(.72)"/>
+      <g class="loose">
+        <use href="#petal" transform="translate(58 176) rotate(140) scale(.55)"/>
+        <use href="#petal" transform="translate(162 200) rotate(-100) scale(.5)"/>
+        <use href="#petal" transform="translate(232 166) rotate(64) scale(.46)"/>
+        <use href="#petal" transform="translate(16 134) rotate(205) scale(.5)"/>
+        <use href="#petal" transform="translate(372 120) rotate(-30) scale(.42)"/>
+      </g>
+    </svg>
+    <div class="mast-in">
+      <img id="badge" class="badge" alt="" hidden>
+      <div>
+        <p class="kicker" id="kicker">Clash of Clans</p>
+        <h1 id="clan-name">Lovely</h1>
+        <p class="sub" id="clan-sub"></p>
+        <a class="join" href="https://discord.gg/8wmVTaMsVR" target="_blank" rel="noopener"><svg class="discord" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Join us on Discord <span aria-hidden="true">→</span></a>
+        <button class="mode" id="mode" type="button">Dark mode</button>
+      </div>
+    </div>
+  </header>
+  <nav id="tabs" aria-label="Sections"></nav>
+  <main id="page"><p class="empty">Loading…</p></main>
   <footer id="foot"></footer>
-  <script src="app.js"></script>
+  <dialog id="viewer" class="viewer" aria-label="Screenshot">
+    <button class="vx" id="viewer-close" type="button" aria-label="Close">&times;</button>
+    <p class="vcap" id="viewer-cap"></p>
+    <img id="viewer-img" alt="">
+    <div class="vbar">
+      <button id="viewer-prev" type="button" aria-label="Previous screenshot">&larr;</button>
+      <span id="viewer-count"></span>
+      <button id="viewer-next" type="button" aria-label="Next screenshot">&rarr;</button>
+    </div>
+  </dialog>
+  <script src="app.js?v=90c6fd6946"></script>
 </body>
 </html>
